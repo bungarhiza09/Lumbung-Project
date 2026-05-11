@@ -6,12 +6,14 @@ const NAV_KELUARGA = [
   { path: '/dashboard', icon: '🏠', label: 'Beranda' },
   { path: '/nutrisi', icon: '🤖', label: 'AI Nutrisi' },
   { path: '/food-rescue', icon: '🍱', label: 'Food Rescue' },
+  { path: '/chat', icon: '💬', label: 'Chat' },   
   { path: '/pengetahuan', icon: '📚', label: 'Pengetahuan' },
 ]
 
 const NAV_WARUNG = [
   { path: '/dashboard', icon: '🏠', label: 'Beranda' },
   { path: '/donasi', icon: '🍱', label: 'Kelola Donasi' },
+  { path: '/chat', icon: '💬', label: 'Chat' },  
   { path: '/impact', icon: '📊', label: 'Impact' },
 ]
 
