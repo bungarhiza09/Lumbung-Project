@@ -5,6 +5,151 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Upload base64 ke Supabase Storage
+async function uploadToSupabase(base64: string, mimeType: string): Promise<string> {
+  const SUPABASE_URL = Deno.env.get('PROJECT_URL')
+  const SERVICE_KEY = Deno.env.get('SERVICE_ROLE_KEY')
+
+  if (!SUPABASE_URL || !SERVICE_KEY) {
+    throw new Error('ENV Supabase belum diset')
+  }
+
+  const ext = mimeType?.includes('png') ? 'png' : 'jpg'
+  const fileName = `uploads/${crypto.randomUUID()}.${ext}`
+
+  const binary = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
+
+  const res = await fetch(
+    `${SUPABASE_URL}/storage/v1/object/food-images/${fileName}`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SERVICE_KEY}`,
+        'Content-Type': mimeType || 'image/jpeg',
+      },
+      body: binary,
+    }
+  )
+
+  if (!res.ok) {
+    const err = await res.text()
+    console.error('UPLOAD ERROR:', err)
+    throw new Error('Upload gambar gagal: ' + err)
+  }
+
+  return `${SUPABASE_URL}/storage/v1/object/public/food-images/${fileName}`
+}
+
+// Kirim ke Groq dengan model vision llama-4-scout
+async function analyzeWithGroq(imageUrl: string): Promise<string> {
+  const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY')
+
+  if (!GROQ_API_KEY) {
+    throw new Error('GROQ_API_KEY belum diset')
+  }
+
+  const prompt = `Anda adalah ahli gizi Indonesia. Analisis gambar makanan ini.
+
+WAJIB:
+- Output HARUS JSON valid saja
+- Tanpa markdown, tanpa backtick, tanpa teks tambahan apapun
+- Langsung mulai dengan karakter {
+
+Format output:
+{
+  "makanan_terdeteksi": ["nama makanan 1", "nama makanan 2"],
+  "estimasi_porsi": "deskripsi porsi misal: 1 piring sedang sekitar 250g",
+  "gizi": {
+    "kalori": 350,
+    "protein_gram": 15,
+    "karbohidrat_gram": 45,
+    "lemak_gram": 10
+  },
+  "catatan": "penjelasan singkat tentang kandungan gizi dan saran"
+}`
+
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image_url',
+              image_url: {
+                url: imageUrl,
+              },
+            },
+            {
+              type: 'text',
+              text: prompt,
+            },
+          ],
+        },
+      ],
+      max_tokens: 1024,
+      temperature: 0.2, // rendah supaya output lebih konsisten/deterministik
+    }),
+  })
+
+  const data = await response.json()
+  console.log('FULL GROQ RESPONSE:', JSON.stringify(data, null, 2))
+
+  if (!response.ok) {
+    const errMsg = data.error?.message || JSON.stringify(data)
+    throw new Error('Groq API error: ' + errMsg)
+  }
+
+  const text = data.choices?.[0]?.message?.content
+  if (!text) {
+    throw new Error('Groq tidak mengembalikan konten')
+  }
+
+  return text
+}
+
+// Parse teks jadi JSON, dengan fallback
+function parseResult(raw: string) {
+  // Bersihkan markdown jika ada (```json ... ```)
+  const cleaned = raw
+    .replace(/```json\s*/gi, '')
+    .replace(/```\s*/gi, '')
+    .trim()
+
+  // Ambil blok JSON pertama
+  const match = cleaned.match(/\{[\s\S]*\}/)
+
+  if (!match) {
+    console.error('Tidak ada JSON ditemukan di:', raw)
+    return {
+      makanan_terdeteksi: [],
+      estimasi_porsi: '-',
+      gizi: { kalori: 0, protein_gram: 0, karbohidrat_gram: 0, lemak_gram: 0 },
+      catatan: 'Format tidak valid dari AI',
+      raw,
+    }
+  }
+
+  try {
+    return JSON.parse(match[0])
+  } catch (e) {
+    console.error('JSON parse error:', e.message, '| Raw:', raw)
+    return {
+      makanan_terdeteksi: [],
+      estimasi_porsi: '-',
+      gizi: { kalori: 0, protein_gram: 0, karbohidrat_gram: 0, lemak_gram: 0 },
+      catatan: 'Gagal parsing respons AI',
+      raw,
+    }
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -16,118 +161,34 @@ serve(async (req) => {
 
     if (!base64Image) {
       return new Response(
-        JSON.stringify({ error: 'base64Image wajib diisi' }),
+        JSON.stringify({ error: 'base64Image tidak ditemukan di body' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY')
+    // Bersihkan prefix data URL jika ada (misal: "data:image/jpeg;base64,...")
+    const cleanBase64 = base64Image.includes(',')
+      ? base64Image.split(',')[1]
+      : base64Image
 
-    if (!OPENROUTER_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: 'API key tidak ditemukan di server' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+    // 1. Upload ke Supabase Storage supaya dapat public URL
+    const imageUrl = await uploadToSupabase(cleanBase64, mimeType || 'image/jpeg')
+    console.log('Image URL:', imageUrl)
 
-    const prompt = `Kamu adalah ahli gizi Indonesia. Analisis makanan dalam foto ini.
-Identifikasi semua makanan/bahan yang terlihat, lalu hitung estimasi kandungan gizi totalnya.
-Fokus pada makanan lokal Indonesia (nasi, tempe, tahu, sayuran, ikan, dll).
+    // 2. Kirim URL gambar ke Groq untuk dianalisis
+    const rawText = await analyzeWithGroq(imageUrl)
+    console.log('GROQ RAW TEXT:', rawText)
 
-Balas HANYA dalam format JSON ini, tanpa teks lain apapun, tanpa markdown:
-{
-  "makanan_terdeteksi": ["nama makanan 1", "nama makanan 2"],
-  "estimasi_porsi": "deskripsi singkat porsi",
-  "gizi": {
-    "kalori": 0,
-    "protein_gram": 0,
-    "karbohidrat_gram": 0,
-    "lemak_gram": 0,
-    "zat_besi_mg": 0,
-    "vitamin_a_mcg": 0,
-    "kalsium_mg": 0
-  },
-  "penilaian": "baik",
-  "catatan": "penjelasan singkat 1-2 kalimat",
-  "saran": "saran perbaikan gizi jika ada"
-}`
-
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'HTTP-Referer': 'https://lumbung.vercel.app',
-        'X-Title': 'LUMBUNG App'
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.0-flash-thinking-exp:free',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image_url',
-                image_url: {
-                  url: `data:${mimeType || 'image/jpeg'};base64,${base64Image}`
-                }
-              },
-              {
-                type: 'text',
-                text: prompt
-              }
-            ]
-          }
-        ],
-        temperature: 0.1,
-        max_tokens: 1000
-      })
-    })
-
-    const data = await response.json()
-    console.log('OpenRouter response:', JSON.stringify(data))
-
-    if (!response.ok) {
-      return new Response(
-        JSON.stringify({
-          error: data.error?.message || 'OpenRouter API Error',
-          detail: data
-        }),
-        {
-          status: response.status,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
-
-    const text = data.choices?.[0]?.message?.content || ''
-    console.log('Raw text dari AI:', text)
-
-    if (!text || text.trim() === '') {
-      return new Response(
-        JSON.stringify({ error: 'AI mengembalikan response kosong' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Cari JSON di dalam response
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      return new Response(
-        JSON.stringify({ error: 'Format response tidak valid', raw: text }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    const hasil = JSON.parse(jsonMatch[0])
+    // 3. Parse JSON dari respons
+    const result = parseResult(rawText)
 
     return new Response(
-      JSON.stringify(hasil),
+      JSON.stringify(result),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
-    console.error('Edge function error:', error)
+    console.error('Error:', error.message)
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
