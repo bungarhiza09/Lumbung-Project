@@ -416,35 +416,46 @@ entrypoint = "./functions/analisis-gizi/index.ts"
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/analisis-gizi/*.html" ]
 
-[functions.hitung-zscore]
+[functions.analyze-food]
 enabled = true
 verify_jwt = true
-import_map = "./functions/hitung-zscore/deno.json"
+import_map = "./functions/analyze-food/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
-entrypoint = "./functions/hitung-zscore/index.ts"
+entrypoint = "./functions/analyze-food/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/hitung-zscore/*.html" ]
+# static_files = [ "./functions/analyze-food/*.html" ]
 
-[functions.import-balita-excel]
+[functions.meal-planner]
 enabled = true
 verify_jwt = true
-import_map = "./functions/import-balita-excel/deno.json"
+import_map = "./functions/meal-planner/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
-entrypoint = "./functions/import-balita-excel/index.ts"
+entrypoint = "./functions/meal-planner/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/import-balita-excel/*.html" ]
+# static_files = [ "./functions/meal-planner/*.html" ]
 
-[functions.export-laporan-pdf]
+[functions.check-deficiency]
 enabled = true
 verify_jwt = true
-import_map = "./functions/export-laporan-pdf/deno.json"
+import_map = "./functions/check-deficiency/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
-entrypoint = "./functions/export-laporan-pdf/index.ts"
+entrypoint = "./functions/check-deficiency/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/export-laporan-pdf/*.html" ]
+# static_files = [ "./functions/check-deficiency/*.html" ]
+
+[functions.chat-nutrisi]
+enabled = true
+verify_jwt = true
+import_map = "./functions/chat-nutrisi/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/chat-nutrisi/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/chat-nutrisi/*.html" ]

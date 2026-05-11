@@ -1,4 +1,6 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import Anthropic from "https://esm.sh/@anthropic-ai/sdk@0.24.0"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -151,7 +153,6 @@ function parseResult(raw: string) {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -190,8 +191,8 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error:', error.message)
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: false, error: error.message }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })
