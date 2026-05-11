@@ -415,3 +415,36 @@ entrypoint = "./functions/analisis-gizi/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/analisis-gizi/*.html" ]
+
+[functions.hitung-zscore]
+enabled = true
+verify_jwt = true
+import_map = "./functions/hitung-zscore/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/hitung-zscore/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/hitung-zscore/*.html" ]
+
+[functions.import-balita-excel]
+enabled = true
+verify_jwt = true
+import_map = "./functions/import-balita-excel/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/import-balita-excel/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/import-balita-excel/*.html" ]
+
+[functions.export-laporan-pdf]
+enabled = true
+verify_jwt = true
+import_map = "./functions/export-laporan-pdf/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/export-laporan-pdf/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/export-laporan-pdf/*.html" ]
