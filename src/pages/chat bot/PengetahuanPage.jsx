@@ -8,10 +8,10 @@ import Layout from '../../components/Layout'
 
 const TABS = [
   { id: 'chatbot', icon: '💬', label: 'Chatbot Gizi', desc: 'Tanya AI ahli gizi' },
-  { id: 'resep', icon: '📖', label: 'Resep Lokal', desc: 'Masakan bergizi murah' },
-  { id: 'video', icon: '🎬', label: 'Video', desc: 'Edukasi dari ahli' },
-  { id: 'kelas', icon: '🎓', label: 'Kelas Kader', desc: 'Khusus Posyandu' },
-  { id: 'forum', icon: '👥', label: 'Forum', desc: 'Diskusi komunitas' },
+  { id: 'resep',   icon: '📖', label: 'Resep Lokal',  desc: 'Masakan bergizi murah' },
+  { id: 'video',   icon: '🎬', label: 'Video',        desc: 'Edukasi dari ahli' },
+  { id: 'kelas',   icon: '🎓', label: 'Kelas',        desc: 'Tingkatkan pengetahuanmu' },
+  { id: 'forum',   icon: '👥', label: 'Forum',        desc: 'Diskusi komunitas' },
 ]
 
 export default function PengetahuanPage() {
@@ -28,9 +28,7 @@ export default function PengetahuanPage() {
           <div className="absolute -bottom-6 left-8 w-24 h-24 rounded-full bg-white/5" />
           <div className="relative">
             <span className="text-3xl">📚</span>
-            <h1 className="text-xl font-bold text-white mt-2 mb-1">
-              Lumbung Pengetahuan
-            </h1>
+            <h1 className="text-xl font-bold text-white mt-2 mb-1">Lumbung Pengetahuan</h1>
             <p className="text-xs text-white/70 leading-relaxed">
               Pusat edukasi gizi untuk keluarga Indonesia. Dari chatbot AI, resep lokal bergizi, hingga kelas kader Posyandu — semua gratis untukmu.
             </p>
@@ -46,7 +44,7 @@ export default function PengetahuanPage() {
               className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-semibold transition-all ${
                 activeTab === tab.id
                   ? 'bg-[#2D6A4F] text-white shadow-md shadow-[#2D6A4F]/30'
-                  : 'bg-white text-[#4a4a3a] border border-[#e8e4db] hover:bg-[#f0faf4]'
+                  : 'bg-white text-[#4a4a3a] border border-[#e8e4db] hover:bg-[#f0faf4] hover:border-[#b7e4cc]'
               }`}
             >
               <span>{tab.icon}</span>
@@ -74,7 +72,6 @@ export default function PengetahuanPage() {
             {activeTab === 'forum'   && <ForumPage />}
           </div>
         </div>
-
         <div className="h-6" />
       </div>
     </Layout>

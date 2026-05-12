@@ -32,9 +32,9 @@ serve(async (req) => {
     // Simpan pesan user
     await supabase.from("ai_chat_messages").insert({
       session_id,
-      role: "user",
+      role: "user", 
       content: userMsg.content,
-    });
+    })
 
     // Panggil Groq API
     const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -71,7 +71,7 @@ serve(async (req) => {
       session_id,
       role: "assistant",
       content: assistantReply,
-    });
+    })
 
     return new Response(
       JSON.stringify({ reply: assistantReply }),

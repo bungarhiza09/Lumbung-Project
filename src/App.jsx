@@ -10,9 +10,10 @@ import PostingDonasi from './pages/food rescue/PostingDonasi'
 import ChatDonasi from './pages/chat/ChatDonasi'
 import DaftarChat from './pages/chat/DaftarChat'
 import PengetahuanPage from './pages/chat bot/PengetahuanPage'
-
-// Di dalam <Routes> tambahkan:
-<Route path="/pengetahuan" element={<PengetahuanPage />} />
+import GamifikasiPage from './pages/gamifikasi/GamifikasiPage'
+import RiwayatDonasi from './pages/food rescue/RiwayatDonasi'
+import ImpactDashboard from './pages/food rescue/ImpactDashboard'
+import JadwalDonasi from './pages/food rescue/JadwalDonasi'
 
 function App() {
   const { user, profile, loading } = useAuth()
@@ -49,6 +50,9 @@ function App() {
       //Food Rescue
       <Route path="/food-rescue" element={user ? <FoodRescue /> : <Navigate to="/auth" />} />
       <Route path="/donasi/buat" element={user ? <PostingDonasi /> : <Navigate to="/auth" />} />
+      <Route path="/donasi/riwayat" element={user ? <RiwayatDonasi /> : <Navigate to="/auth" />} />
+      <Route path="/impact" element={user ? <ImpactDashboard /> : <Navigate to="/auth" />} />
+      <Route path="/donasi/jadwal" element={user ? <JadwalDonasi /> : <Navigate to="/auth" />} />
 
       //Chat
       <Route path="/chat" element={user ? <DaftarChat /> : <Navigate to="/auth" />} />
@@ -56,6 +60,9 @@ function App() {
 
       //Chatbot Pengetahuan
       <Route path="/pengetahuan" element={<PengetahuanPage />} />
+
+      // Gamifikasi
+      <Route path="/gamifikasi" element={<GamifikasiPage />} />
     </Routes>
   )
 }
