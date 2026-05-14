@@ -68,7 +68,7 @@ export default function FoodRescue() {
         {/* Hero Banner */}
         <div className="relative bg-[#2D6A4F] rounded-3xl p-6 mb-6 overflow-hidden">
           {/* Dekorasi lingkaran */}
-          <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full bg-white/5" />
+          <div className="absolute -t op-8 -right-8 w-40 h-40 rounded-full bg-white/5" />
           <div className="absolute -bottom-6 -left-6 w-32 h-32 rounded-full bg-white/5" />
           <div className="absolute top-4 right-16 w-3 h-3 rounded-full bg-[#F4A261]/60" />
           <div className="absolute bottom-8 right-8 w-2 h-2 rounded-full bg-white/40" />

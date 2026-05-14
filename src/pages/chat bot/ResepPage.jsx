@@ -1,18 +1,19 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../contexts/AuthContext'
 
 const CATEGORIES = ['Semua', 'MPASI', 'Balita', 'Umum', 'Ibu Hamil', 'Lansia']
 
 export default function ResepPage() {
+  const { user } = useAuth()
   const [recipes, setRecipes] = useState([])
   const [category, setCategory] = useState('Semua')
   const [maxBudget, setMaxBudget] = useState(50000)
   const [selected, setSelected] = useState(null)
+  const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchRecipes()
-  }, [category, maxBudget])
+  useEffect(() => { fetchRecipes() }, [category, maxBudget])
 
   async function fetchRecipes() {
     setLoading(true)
@@ -25,20 +26,29 @@ export default function ResepPage() {
     setLoading(false)
   }
 
+  if (showForm) return <TambahResepForm onBack={() => { setShowForm(false); fetchRecipes() }} />
   if (selected) return <RecipeDetail recipe={selected} onBack={() => setSelected(null)} />
 
   return (
     <div>
-      {/* Info */}
-      <div className="bg-[#f0faf4] rounded-2xl p-3 mb-4 border border-[#b7e4cc]">
-        <p className="text-xs font-semibold text-[#2D6A4F] mb-0.5">📖 Resep Lokal Bergizi</p>
-        <p className="text-xs text-[#5a7a6a]">
-          Resep berbahan lokal Indonesia yang murah, bergizi, dan mudah dibuat. Filter sesuai budget dan kebutuhanmu.
-        </p>
+      {/* Header + Tombol Tambah */}
+      <div className="flex items-center justify-between mb-4 gap-2">
+        <div className="bg-[#f0faf4] rounded-2xl p-3 flex-1 border border-[#b7e4cc]">
+          <p className="text-xs font-semibold text-[#2D6A4F] mb-0.5">📖 Resep Lokal Bergizi</p>
+          <p className="text-xs text-[#5a7a6a]">Resep berbahan lokal Indonesia yang murah dan bergizi.</p>
+        </div>
+        {user && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex-shrink-0 bg-[#2D6A4F] hover:bg-[#235c43] text-white text-xs font-semibold px-3 py-2 rounded-2xl flex items-center gap-1 shadow-md shadow-[#2D6A4F]/20 transition-all"
+          >
+            <span>+</span> Tambah
+          </button>
+        )}
       </div>
 
       {/* Budget Slider */}
-      <div className="bg-white rounded-2xl border border-[#e8e4db] p-3 mb-4">
+      <div className="bg-[#faf9f7] rounded-2xl border border-[#e8e4db] p-3 mb-4">
         <div className="flex justify-between text-xs mb-2">
           <span className="text-[#4a4a3a] font-medium">Budget per porsi</span>
           <span className="font-bold text-[#2D6A4F]">Rp {maxBudget.toLocaleString('id-ID')}</span>
@@ -50,12 +60,11 @@ export default function ResepPage() {
           className="w-full accent-[#2D6A4F]"
         />
         <div className="flex justify-between text-xs text-[#9a9a8a] mt-1">
-          <span>Rp 5.000</span>
-          <span>Rp 50.000</span>
+          <span>Rp 5.000</span><span>Rp 50.000</span>
         </div>
       </div>
 
-      {/* Category */}
+      {/* Category Filter */}
       <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
         {CATEGORIES.map(c => (
           <button key={c} onClick={() => setCategory(c)}
@@ -69,6 +78,7 @@ export default function ResepPage() {
         ))}
       </div>
 
+      {/* Loading */}
       {loading ? (
         <div className="grid grid-cols-2 gap-3">
           {[1,2,3,4].map(i => (
@@ -86,6 +96,12 @@ export default function ResepPage() {
           <p className="text-4xl mb-2">🍽️</p>
           <p className="text-sm font-medium text-[#4a4a3a]">Belum ada resep</p>
           <p className="text-xs text-[#9a9a8a] mt-1">Coba ubah filter budget atau kategori</p>
+          {user && (
+            <button onClick={() => setShowForm(true)}
+              className="mt-3 text-xs text-[#2D6A4F] font-semibold underline">
+              + Tambah resep pertama
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
@@ -96,18 +112,10 @@ export default function ResepPage() {
                 <span className="text-4xl">🥘</span>
               </div>
               <div className="p-3">
-                <p className="text-xs font-semibold text-[#1a3a2a] line-clamp-2 leading-tight mb-1">
-                  {r.title}
-                </p>
-                <p className="text-xs font-bold text-[#2D6A4F]">
-                  Rp {r.budget_per_portion?.toLocaleString('id-ID')}/porsi
-                </p>
-                <p className="text-xs text-[#9a9a8a] mt-1">
-                  {r.nutrition?.kalori} kkal · {r.nutrition?.protein}g protein
-                </p>
-                <span className="inline-block mt-2 text-xs bg-[#f0faf4] text-[#2D6A4F] px-2 py-0.5 rounded-full border border-[#b7e4cc]">
-                  {r.category}
-                </span>
+                <p className="text-xs font-semibold text-[#1a3a2a] line-clamp-2 leading-tight mb-1">{r.title}</p>
+                <p className="text-xs font-bold text-[#2D6A4F]">Rp {r.budget_per_portion?.toLocaleString('id-ID')}/porsi</p>
+                <p className="text-xs text-[#9a9a8a] mt-1">{r.nutrition?.kalori} kkal · {r.nutrition?.protein}g protein</p>
+                <span className="inline-block mt-2 text-xs bg-[#f0faf4] text-[#2D6A4F] px-2 py-0.5 rounded-full border border-[#b7e4cc]">{r.category}</span>
               </div>
             </div>
           ))}
@@ -117,7 +125,151 @@ export default function ResepPage() {
   )
 }
 
+// ─── Form Tambah Resep ───────────────────────────────────────
+function TambahResepForm({ onBack }) {
+  const { user } = useAuth()
+  const [loading, setLoading] = useState(false)
+  const [form, setForm] = useState({
+    title: '', description: '', budget_per_portion: '', category: 'Umum',
+    kalori: '', protein: '', zat_besi: '',
+    bahan: [{ nama: '', jumlah: '', satuan: '', harga_estimasi: '' }],
+    langkah: [{ instruksi: '' }],
+  })
+
+  function updateBahan(idx, field, val) {
+    const arr = [...form.bahan]
+    arr[idx][field] = val
+    setForm(f => ({ ...f, bahan: arr }))
+  }
+
+  function updateLangkah(idx, val) {
+    const arr = [...form.langkah]
+    arr[idx].instruksi = val
+    setForm(f => ({ ...f, langkah: arr }))
+  }
+
+  async function handleSubmit() {
+    if (!form.title || !form.budget_per_portion) return
+    setLoading(true)
+    await supabase.from('recipes').insert({
+      title: form.title,
+      description: form.description,
+      budget_per_portion: parseInt(form.budget_per_portion),
+      category: form.category,
+      is_verified: true,
+      author_id: user?.id,
+      nutrition: {
+        kalori: parseInt(form.kalori) || 0,
+        protein: parseInt(form.protein) || 0,
+        zat_besi: parseFloat(form.zat_besi) || 0
+      },
+      ingredients: form.bahan.filter(b => b.nama).map(b => ({
+        nama: b.nama, jumlah: b.jumlah, satuan: b.satuan,
+        harga_estimasi: parseInt(b.harga_estimasi) || 0
+      })),
+      steps: form.langkah.filter(l => l.instruksi).map((l, i) => ({
+        urutan: i + 1, instruksi: l.instruksi
+      })),
+    })
+    setLoading(false)
+    onBack()
+  }
+
+  const inputClass = "w-full px-3 py-2.5 rounded-xl border border-[#e8e4db] bg-[#faf9f7] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 focus:border-[#2D6A4F] transition-all"
+
+  return (
+    <div>
+      <button onClick={onBack} className="text-sm text-[#2D6A4F] font-medium mb-4">← Kembali</button>
+      <h2 className="text-base font-bold text-[#1a3a2a] mb-4">Tambah Resep Baru</h2>
+      <div className="space-y-4">
+
+        <input value={form.title} onChange={e => setForm(f => ({...f, title: e.target.value}))}
+          placeholder="Nama resep *" className={inputClass} />
+
+        <textarea value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))}
+          placeholder="Deskripsi singkat" rows={2} className={inputClass + ' resize-none'} />
+
+        <div className="grid grid-cols-2 gap-3">
+          <input type="number" value={form.budget_per_portion}
+            onChange={e => setForm(f => ({...f, budget_per_portion: e.target.value}))}
+            placeholder="Budget/porsi (Rp) *" className={inputClass} />
+          <select value={form.category} onChange={e => setForm(f => ({...f, category: e.target.value}))} className={inputClass}>
+            {['MPASI','Balita','Umum','Ibu Hamil','Lansia'].map(c => <option key={c}>{c}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <p className="text-xs font-medium text-[#4a4a3a] mb-2">Kandungan Gizi</p>
+          <div className="grid grid-cols-3 gap-2">
+            <input type="number" value={form.kalori} onChange={e => setForm(f => ({...f, kalori: e.target.value}))}
+              placeholder="Kalori" className={inputClass} />
+            <input type="number" value={form.protein} onChange={e => setForm(f => ({...f, protein: e.target.value}))}
+              placeholder="Protein (g)" className={inputClass} />
+            <input type="number" value={form.zat_besi} onChange={e => setForm(f => ({...f, zat_besi: e.target.value}))}
+              placeholder="Zat Besi (mg)" className={inputClass} />
+          </div>
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold text-[#1a3a2a] mb-2">🥘 Bahan-bahan</p>
+          {form.bahan.map((b, i) => (
+            <div key={i} className="grid grid-cols-4 gap-2 mb-2">
+              <input value={b.nama} onChange={e => updateBahan(i, 'nama', e.target.value)}
+                placeholder="Bahan" className={inputClass + ' col-span-2'} />
+              <input value={b.jumlah} onChange={e => updateBahan(i, 'jumlah', e.target.value)}
+                placeholder="Jml" className={inputClass} />
+              <input value={b.satuan} onChange={e => updateBahan(i, 'satuan', e.target.value)}
+                placeholder="Satuan" className={inputClass} />
+            </div>
+          ))}
+          <button type="button"
+            onClick={() => setForm(f => ({...f, bahan: [...f.bahan, {nama:'',jumlah:'',satuan:'',harga_estimasi:''}]}))}
+            className="text-xs text-[#2D6A4F] font-medium">
+            + Tambah bahan
+          </button>
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold text-[#1a3a2a] mb-2">📝 Langkah Memasak</p>
+          {form.langkah.map((l, i) => (
+            <div key={i} className="flex gap-2 mb-2">
+              <div className="w-6 h-6 rounded-full bg-[#2D6A4F] text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-2">
+                {i+1}
+              </div>
+              <textarea value={l.instruksi} onChange={e => updateLangkah(i, e.target.value)}
+                placeholder={`Langkah ${i+1}`} rows={2}
+                className={inputClass + ' resize-none flex-1'} />
+            </div>
+          ))}
+          <button type="button"
+            onClick={() => setForm(f => ({...f, langkah: [...f.langkah, {instruksi:''}]}))}
+            className="text-xs text-[#2D6A4F] font-medium">
+            + Tambah langkah
+          </button>
+        </div>
+
+        <button onClick={handleSubmit}
+          disabled={loading || !form.title || !form.budget_per_portion}
+          className="w-full bg-[#2D6A4F] hover:bg-[#235c43] text-white py-3.5 rounded-2xl text-sm font-semibold disabled:opacity-40 shadow-md shadow-[#2D6A4F]/20 transition-all">
+          {loading ? 'Menyimpan...' : '✅ Simpan Resep'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Detail Resep ────────────────────────────────────────────
 function RecipeDetail({ recipe, onBack }) {
+  const [author, setAuthor] = useState(null)
+
+  useEffect(() => {
+    if (recipe.author_id) {
+      supabase.from('profiles').select('nama')
+        .eq('id', recipe.author_id).single()
+        .then(({ data }) => setAuthor(data))
+    }
+  }, [])
+
   return (
     <div>
       <button onClick={onBack} className="flex items-center gap-1 text-sm text-[#2D6A4F] font-medium mb-4">
@@ -129,14 +281,26 @@ function RecipeDetail({ recipe, onBack }) {
       </div>
 
       <h2 className="text-base font-bold text-[#1a3a2a] mb-1">{recipe.title}</h2>
+
+      {author && (
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-6 h-6 rounded-full bg-[#2D6A4F] flex items-center justify-center text-white text-xs font-bold">
+            {author.nama?.[0]?.toUpperCase()}
+          </div>
+          <p className="text-xs text-[#7a8a7a]">
+            Dibagikan oleh <span className="font-semibold text-[#2D6A4F]">{author.nama}</span>
+          </p>
+        </div>
+      )}
+
       <p className="text-xs text-[#7a8a7a] mb-4 leading-relaxed">{recipe.description}</p>
 
       {/* Nutrition */}
       <div className="grid grid-cols-4 gap-2 mb-5">
         {[
           { label: 'Budget', val: `Rp ${recipe.budget_per_portion?.toLocaleString('id-ID')}`, bg: 'bg-[#f0faf4]', text: 'text-[#2D6A4F]' },
-          { label: 'Kalori', val: `${recipe.nutrition?.kalori}`, bg: 'bg-orange-50', text: 'text-orange-600' },
-          { label: 'Protein', val: `${recipe.nutrition?.protein}g`, bg: 'bg-blue-50', text: 'text-blue-600' },
+          { label: 'Kalori', val: `${recipe.nutrition?.kalori}`, bg: 'bg-orange-50', text: 'text-orange-500' },
+          { label: 'Protein', val: `${recipe.nutrition?.protein}g`, bg: 'bg-[#f0faf4]', text: 'text-[#2D6A4F]' },
           { label: 'Zat Besi', val: `${recipe.nutrition?.zat_besi}mg`, bg: 'bg-red-50', text: 'text-red-500' },
         ].map(s => (
           <div key={s.label} className={`${s.bg} rounded-xl p-2 text-center`}>
@@ -152,7 +316,7 @@ function RecipeDetail({ recipe, onBack }) {
         {recipe.ingredients?.map((ing, i) => (
           <div key={i} className={`flex justify-between text-xs px-4 py-2.5 ${i % 2 === 0 ? 'bg-[#faf9f7]' : 'bg-white'}`}>
             <span className="text-[#4a4a3a]">{ing.nama} — {ing.jumlah} {ing.satuan}</span>
-            <span className="text-[#9a9a8a]">±Rp {Number(ing.harga_estimasi).toLocaleString('id-ID')}</span>
+            <span className="text-[#9a9a8a]">±Rp {Number(ing.harga_estimasi || 0).toLocaleString('id-ID')}</span>
           </div>
         ))}
       </div>

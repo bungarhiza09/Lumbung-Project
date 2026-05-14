@@ -15,6 +15,7 @@ const NAV_WARUNG = [
   { path: '/donasi', icon: '🍱', label: 'Kelola Donasi' },
   { path: '/chat', icon: '💬', label: 'Chat' },  
   { path: '/impact', icon: '📊', label: 'Impact' },
+  { path: '/pengetahuan', icon: '📚', label: 'Pengetahuan' },
 ]
 
 const NAV_KADER = [
@@ -95,6 +96,9 @@ export default function Navbar() {
                 </div>
                 <Link to="/profil" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 px-4 py-3 text-sm text-[#4a4a3a] hover:bg-[#f5f3ee]">
                   👤 Profil Saya
+                </Link>
+                <Link to="/gamifikasi" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 px-4 py-3 text-sm text-[#4a4a3a] hover:bg-[#f5f3ee]">
+                  🏆 Poin & Reward
                 </Link>
                 <button onClick={handleLogout} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-500 hover:bg-red-50">
                   🚪 Keluar

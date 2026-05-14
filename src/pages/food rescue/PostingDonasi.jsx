@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import Layout from '../../components/Layout'
 import LocationPicker from '../../components/LocationPicker'
+import { tambahPoin } from '../../lib/poinHelper'
 
 export default function PostingDonasi() {
   const { user, profile } = useAuth()
@@ -75,9 +76,7 @@ export default function PostingDonasi() {
         status: 'tersedia'
       })
       if (insertError) throw insertError
-      await supabase.from('profiles')
-        .update({ poin: (profile?.poin || 0) + 50 })
-        .eq('id', user.id)
+      await tambahPoin(user.id, 'donasi_porsi', `Donasi: ${form.nama_makanan} (${form.jumlah_porsi} porsi)`)
       navigate('/food-rescue')
     } catch (err) {
       setError('Gagal memposting donasi. Coba lagi.')
