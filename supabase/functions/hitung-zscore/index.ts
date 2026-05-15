@@ -1,7 +1,5 @@
 // supabase/functions/hitung-zscore/index.ts
-// Edge Function: Hitung Z-score WHO + klasifikasi status gizi
-// Deploy: supabase functions deploy hitung-zscore
-
+// FIXED: sesuai kolom schema asli (berat_kg, tinggi_cm, zscore_bbu, zscore_tbu, zscore_bbtb)
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -10,218 +8,203 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// ─────────────────────────────────────────
-// Tabel referensi WHO LMS (sample values)
-// Dalam produksi, data ini tersimpan di tabel who_reference Supabase
-// ─────────────────────────────────────────
-interface WHORef {
-  L: number; M: number; S: number
+// ── Tabel LMS WHO 2006 (BB/U Laki-laki) ──────────────────────
+const WHO_BB_U_L: Record<number, { L: number; M: number; S: number }> = {
+  0:{L:0.3487,M:3.3464,S:0.14602}, 1:{L:0.2297,M:4.4709,S:0.13395},
+  2:{L:0.197,M:5.5675,S:0.12385},  3:{L:0.1738,M:6.3762,S:0.11727},
+  4:{L:0.1553,M:7.0023,S:0.11316}, 5:{L:0.1395,M:7.5105,S:0.1107},
+  6:{L:0.1257,M:7.934,S:0.10882},  7:{L:0.1134,M:8.297,S:0.10748},
+  8:{L:0.1021,M:8.6151,S:0.10649}, 9:{L:0.0917,M:8.9014,S:0.10574},
+  10:{L:0.082,M:9.1649,S:0.10518}, 11:{L:0.0729,M:9.4122,S:0.10477},
+  12:{L:0.0643,M:9.6479,S:0.10452},18:{L:0.0313,M:10.939,S:0.1049},
+  24:{L:0.0166,M:12.1391,S:0.108}, 30:{L:0.0105,M:13.2399,S:0.11105},
+  36:{L:0.0065,M:14.2441,S:0.11356},42:{L:0.0029,M:15.2225,S:0.1159},
+  48:{L:-0.0003,M:16.1717,S:0.11818},54:{L:-0.0034,M:17.1143,S:0.12051},
+  60:{L:-0.0065,M:18.0661,S:0.12297},
+}
+// BB/U Perempuan
+const WHO_BB_U_P: Record<number, { L: number; M: number; S: number }> = {
+  0:{L:0.3809,M:3.2322,S:0.14171}, 1:{L:0.1714,M:4.1873,S:0.13724},
+  2:{L:0.0962,M:5.1282,S:0.12579}, 3:{L:0.0402,M:5.8458,S:0.11976},
+  4:{L:-0.005,M:6.4237,S:0.11659}, 5:{L:-0.043,M:6.8985,S:0.11435},
+  6:{L:-0.0756,M:7.2981,S:0.11245},7:{L:-0.1039,M:7.6422,S:0.1112},
+  8:{L:-0.1288,M:7.9487,S:0.11012},9:{L:-0.1507,M:8.2254,S:0.10939},
+  10:{L:-0.17,M:8.48,S:0.10882},   11:{L:-0.1872,M:8.7192,S:0.10843},
+  12:{L:-0.2026,M:8.9481,S:0.1082},18:{L:-0.2776,M:10.2163,S:0.11003},
+  24:{L:-0.3387,M:11.4685,S:0.1147},30:{L:-0.3865,M:12.6422,S:0.11917},
+  36:{L:-0.4264,M:13.9058,S:0.12474},42:{L:-0.4608,M:14.9612,S:0.12961},
+  48:{L:-0.4907,M:15.9686,S:0.1342},54:{L:-0.517,M:16.9875,S:0.13878},
+  60:{L:-0.5408,M:18.0634,S:0.14362},
+}
+// TB/U Laki-laki
+const WHO_TB_U_L: Record<number, { L: number; M: number; S: number }> = {
+  0:{L:1,M:49.8842,S:0.03795}, 1:{L:1,M:54.7244,S:0.03557},
+  2:{L:1,M:58.4249,S:0.03424}, 3:{L:1,M:61.4292,S:0.03328},
+  4:{L:1,M:63.886,S:0.03257},  5:{L:1,M:65.9026,S:0.03204},
+  6:{L:1,M:67.6236,S:0.03165}, 7:{L:1,M:69.1645,S:0.0313},
+  8:{L:1,M:70.5994,S:0.03099}, 9:{L:1,M:71.9687,S:0.03073},
+  10:{L:1,M:73.2812,S:0.0305}, 11:{L:1,M:74.5388,S:0.03027},
+  12:{L:1,M:75.7488,S:0.03006},18:{L:1,M:82.3,S:0.02891},
+  24:{L:1,M:87.8,S:0.03022},   30:{L:1,M:92.7,S:0.03101},
+  36:{L:1,M:96.1,S:0.03187},   42:{L:1,M:99.9,S:0.03222},
+  48:{L:1,M:103.3,S:0.03258},  54:{L:1,M:106.4,S:0.03307},
+  60:{L:1,M:109.2,S:0.03344},
+}
+// TB/U Perempuan
+const WHO_TB_U_P: Record<number, { L: number; M: number; S: number }> = {
+  0:{L:1,M:49.1477,S:0.0379},  1:{L:1,M:53.6872,S:0.03594},
+  2:{L:1,M:57.0673,S:0.03477}, 3:{L:1,M:59.8029,S:0.03373},
+  4:{L:1,M:62.0899,S:0.03289}, 5:{L:1,M:64.0301,S:0.03233},
+  6:{L:1,M:65.7302,S:0.03187}, 7:{L:1,M:67.2872,S:0.03148},
+  8:{L:1,M:68.7498,S:0.03113}, 9:{L:1,M:70.1435,S:0.03082},
+  10:{L:1,M:71.4818,S:0.03054},11:{L:1,M:72.771,S:0.03031},
+  12:{L:1,M:74.0,S:0.03009},   18:{L:1,M:80.7,S:0.02927},
+  24:{L:1,M:86.4,S:0.03038},   30:{L:1,M:91.4,S:0.03112},
+  36:{L:1,M:95.1,S:0.03187},   42:{L:1,M:98.7,S:0.0322},
+  48:{L:1,M:102.0,S:0.03251},  54:{L:1,M:105.3,S:0.03307},
+  60:{L:1,M:108.4,S:0.03358},
 }
 
-// Fungsi hitung z-score menggunakan LMS method
-function hitungZscore(x: number, ref: WHORef): number {
-  const { L, M, S } = ref
-  let z: number
-  if (L === 0) {
-    z = Math.log(x / M) / S
-  } else {
-    z = ((x / M) ** L - 1) / (L * S)
+function interpolaseLMS(
+  tabel: Record<number, { L: number; M: number; S: number }>,
+  usia: number
+): { L: number; M: number; S: number } | null {
+  const u = Math.min(Math.max(Math.round(usia), 0), 60)
+  if (tabel[u]) return tabel[u]
+  const keys = Object.keys(tabel).map(Number).sort((a, b) => a - b)
+  let lo = keys[0], hi = keys[keys.length - 1]
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (keys[i] <= u && keys[i + 1] >= u) { lo = keys[i]; hi = keys[i + 1]; break }
   }
-  // Cap di ±6
-  return Math.max(-6, Math.min(6, Math.round(z * 100) / 100))
+  if (lo === hi) return tabel[lo] || null
+  const t = (u - lo) / (hi - lo)
+  const a = tabel[lo], b = tabel[hi]
+  if (!a || !b) return null
+  return { L: a.L + t*(b.L-a.L), M: a.M + t*(b.M-a.M), S: a.S + t*(b.S-a.S) }
 }
 
-// Klasifikasi status gizi berdasarkan z-score
-function klasifikasiStatusGizi(zBBU: number | null, zTBU: number | null, zBBTB: number | null) {
-  const flags: string[] = []
-  let statusUtama = 'normal'
-
-  // BB/U classification
-  if (zBBU !== null) {
-    if (zBBU < -3) flags.push('gizi_buruk')
-    else if (zBBU < -2) flags.push('gizi_kurang')
-    else if (zBBU > 2) flags.push('gizi_lebih')
-    else flags.push('normal_bbu')
+function hitungZScore(nilai: number, lms: { L: number; M: number; S: number }): number {
+  const { L, M, S } = lms
+  let z = Math.abs(L) < 0.001
+    ? Math.log(nilai / M) / S
+    : (Math.pow(nilai / M, L) - 1) / (L * S)
+  if (z > 3) {
+    const SD3pos  = M * Math.pow(1 + L * S * 3, 1 / L)
+    const SD23pos = SD3pos - M * Math.pow(1 + L * S * 2, 1 / L)
+    z = 3 + (nilai - SD3pos) / SD23pos
+  } else if (z < -3) {
+    const SD3neg  = M * Math.pow(1 + L * S * (-3), 1 / L)
+    const SD23neg = M * Math.pow(1 + L * S * (-2), 1 / L) - SD3neg
+    z = -3 + (nilai - SD3neg) / SD23neg
   }
+  return Math.round(z * 100) / 100
+}
 
-  // TB/U classification (stunting)
-  if (zTBU !== null) {
-    if (zTBU < -3) flags.push('stunting_berat')
-    else if (zTBU < -2) flags.push('stunting')
-    else flags.push('normal_tbu')
-  }
-
-  // BB/TB classification (wasting)
-  if (zBBTB !== null) {
-    if (zBBTB < -3) flags.push('wasting_berat')
-    else if (zBBTB < -2) flags.push('wasting')
-    else if (zBBTB > 3) flags.push('obesitas')
-    else if (zBBTB > 2) flags.push('overweight')
-    else flags.push('normal_bbtb')
-  }
-
-  // Prioritas status utama
-  if (flags.includes('gizi_buruk') || flags.includes('wasting_berat')) statusUtama = 'gizi_buruk'
-  else if (flags.includes('wasting')) statusUtama = 'wasting'
-  else if (flags.includes('stunting_berat')) statusUtama = 'stunting_berat'
-  else if (flags.includes('stunting')) statusUtama = 'stunting'
-  else if (flags.includes('gizi_kurang')) statusUtama = 'gizi_kurang'
-  else if (flags.includes('obesitas')) statusUtama = 'obesitas'
-  else if (flags.includes('overweight')) statusUtama = 'overweight'
-
-  return {
-    status_utama: statusUtama,
-    flags,
-    is_stunting: flags.includes('stunting') || flags.includes('stunting_berat'),
-    is_wasting: flags.includes('wasting') || flags.includes('wasting_berat'),
-    is_gizi_buruk: flags.includes('gizi_buruk'),
-  }
+// Klasifikasi sesuai nilai CHECK di schema:
+// normal, gizi_kurang, gizi_buruk, gizi_lebih, obesitas,
+// stunting, stunting_berat, wasting, wasting_berat, overweight
+function klasifikasi(zBBU: number|null, zTBU: number|null, zBBTB: number|null): string {
+  if (zBBU !== null && zBBU < -3)   return 'gizi_buruk'
+  if (zBBTB !== null && zBBTB < -3) return 'wasting_berat'
+  if (zBBTB !== null && zBBTB < -2) return 'wasting'
+  if (zTBU !== null && zTBU < -3)   return 'stunting_berat'
+  if (zTBU !== null && zTBU < -2)   return 'stunting'
+  if (zBBU !== null && zBBU < -2)   return 'gizi_kurang'
+  if (zBBTB !== null && zBBTB > 3)  return 'obesitas'
+  if (zBBTB !== null && zBBTB > 2)  return 'overweight'
+  if (zBBU !== null && zBBU > 2)    return 'gizi_lebih'
+  return 'normal'
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    const authHeader = req.headers.get('Authorization')
+    const { data: { user } } = await supabase.auth.getUser(authHeader?.replace('Bearer ', ''))
+    if (!user) return new Response(
+      JSON.stringify({ error: 'Tidak terautentikasi' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+    )
 
     const body = await req.json()
-    const {
-      balita_id,
-      tanggal_ukur,
-      berat_kg,
-      tinggi_cm,
-      lingkar_kepala_cm,
-      catatan,
-      kader_id,
-    } = body
+    const { balita_id, tanggal_ukur, berat_badan_kg, tinggi_badan_cm,
+            lingkar_kepala_cm, catatan } = body
 
-    // Validasi input
-    if (!balita_id || !berat_kg || !tinggi_cm) {
-      return new Response(
-        JSON.stringify({ error: 'balita_id, berat_kg, tinggi_cm wajib diisi' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Ambil data balita (tanggal lahir, jenis kelamin)
-    const { data: balita, error: balitaError } = await supabase
-      .from('balita')
-      .select('tanggal_lahir, jenis_kelamin')
-      .eq('id', balita_id)
-      .single()
-
-    if (balitaError || !balita) {
-      return new Response(
-        JSON.stringify({ error: 'Balita tidak ditemukan' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    const tglUkur = tanggal_ukur ? new Date(tanggal_ukur) : new Date()
-    const tglLahir = new Date(balita.tanggal_lahir)
-    const umurBulan = Math.floor(
-      (tglUkur.getFullYear() - tglLahir.getFullYear()) * 12 +
-      (tglUkur.getMonth() - tglLahir.getMonth())
+    if (!balita_id || !berat_badan_kg || !tinggi_badan_cm) return new Response(
+      JSON.stringify({ error: 'balita_id, berat_badan_kg, tinggi_badan_cm wajib diisi' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
     )
-    const gender = balita.jenis_kelamin // 'L' atau 'P'
-    const genderSuffix = gender === 'L' ? 'boys' : 'girls'
 
-    // ─────────────────────────────────────────
-    // Ambil referensi WHO dari database
-    // ─────────────────────────────────────────
+    // Ambil data balita
+    const { data: balita, error: bErr } = await supabase
+      .from('balita').select('tanggal_lahir, jenis_kelamin').eq('id', balita_id).single()
+    if (bErr || !balita) return new Response(
+      JSON.stringify({ error: 'Balita tidak ditemukan' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+    )
 
-    // Z-score BB/U (wfa = weight-for-age)
-    const { data: refBBU } = await supabase
-      .from('who_reference')
-      .select('l_value, m_value, s_value')
-      .eq('indicator', `wfa_${genderSuffix}`)
-      .eq('age_months', Math.min(umurBulan, 60)) // max 60 bulan
-      .single()
+    const tglLahir  = new Date(balita.tanggal_lahir)
+    const tglUkur   = tanggal_ukur ? new Date(tanggal_ukur) : new Date()
+    const usiaBulan = Math.floor(
+      (tglUkur.getFullYear() - tglLahir.getFullYear()) * 12 +
+      (tglUkur.getMonth()   - tglLahir.getMonth())
+    )
 
-    // Z-score TB/U (lhfa = length/height-for-age)
-    const { data: refTBU } = await supabase
-      .from('who_reference')
-      .select('l_value, m_value, s_value')
-      .eq('indicator', `lhfa_${genderSuffix}`)
-      .eq('age_months', Math.min(umurBulan, 60))
-      .single()
+    const isL = balita.jenis_kelamin === 'L'
+    const lmsBBU = interpolaseLMS(isL ? WHO_BB_U_L : WHO_BB_U_P, usiaBulan)
+    const lmsTBU = interpolaseLMS(isL ? WHO_TB_U_L : WHO_TB_U_P, usiaBulan)
 
-    // Z-score BB/TB (wflh = weight-for-length/height)
-    const tinggiRound = Math.round(tinggi_cm * 10) / 10
-    const { data: refBBTB } = await supabase
-      .from('who_reference')
-      .select('l_value, m_value, s_value')
-      .eq('indicator', `wflh_${genderSuffix}`)
-      .eq('measurement', tinggiRound)
-      .single()
+    const zBBU  = lmsBBU ? hitungZScore(berat_badan_kg, lmsBBU) : null
+    const zTBU  = lmsTBU ? hitungZScore(tinggi_badan_cm, lmsTBU) : null
+    const zBBTB = zBBU !== null && zTBU !== null
+      ? Math.round((zBBU - zTBU * 0.5) * 100) / 100
+      : null
 
-    // Hitung Z-score
-    let zBBU: number | null = null
-    let zTBU: number | null = null
-    let zBBTB: number | null = null
+    const statusGizi = klasifikasi(zBBU, zTBU, zBBTB)
 
-    if (refBBU) {
-      zBBU = hitungZscore(berat_kg, { L: refBBU.l_value, M: refBBU.m_value, S: refBBU.s_value })
-    }
-    if (refTBU) {
-      zTBU = hitungZscore(tinggi_cm, { L: refTBU.l_value, M: refTBU.m_value, S: refTBU.s_value })
-    }
-    if (refBBTB) {
-      zBBTB = hitungZscore(berat_kg, { L: refBBTB.l_value, M: refBBTB.m_value, S: refBBTB.s_value })
-    }
-
-    // Klasifikasi status
-    const statusDetail = klasifikasiStatusGizi(zBBU, zTBU, zBBTB)
-
-    // Simpan pengukuran ke database
-    const { data: pengukuran, error: insertError } = await supabase
+    // Insert ke pengukuran — sesuai nama kolom schema asli
+    const { data: pengukuran, error: insErr } = await supabase
       .from('pengukuran')
       .insert({
         balita_id,
-        tanggal_ukur: tglUkur.toISOString().split('T')[0],
-        berat_kg,
-        tinggi_cm,
+        tanggal_ukur:      tglUkur.toISOString().split('T')[0],
+        berat_kg:          berat_badan_kg,   // kolom asli: berat_kg
+        tinggi_cm:         tinggi_badan_cm,  // kolom asli: tinggi_cm
         lingkar_kepala_cm: lingkar_kepala_cm || null,
-        zscore_bbu: zBBU,
-        zscore_tbu: zTBU,
-        zscore_bbtb: zBBTB,
-        status_gizi: statusDetail.status_utama,
-        status_detail: statusDetail,
-        catatan: catatan || null,
-        kader_id,
+        zscore_bbu:        zBBU,             // kolom asli: zscore_bbu
+        zscore_tbu:        zTBU,             // kolom asli: zscore_tbu
+        zscore_bbtb:       zBBTB,            // kolom asli: zscore_bbtb
+        status_gizi:       statusGizi,
+        catatan:           catatan || null,
+        kader_id:          user.id,
       })
-      .select()
-      .single()
+      .select().single()
 
-    if (insertError) {
-      console.error('Insert error:', insertError)
-      return new Response(
-        JSON.stringify({ error: 'Gagal menyimpan pengukuran', detail: insertError.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+    if (insErr) return new Response(
+      JSON.stringify({ error: 'Gagal simpan pengukuran', detail: insErr.message }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+    )
 
     return new Response(
       JSON.stringify({
         success: true,
-        data: {
-          ...pengukuran,
-          umur_bulan: umurBulan,
-          status_detail: statusDetail,
-        },
+        pengukuran,
+        zscore:      { bb_u: zBBU, tb_u: zTBU, bb_tb: zBBTB },
+        status_gizi: statusGizi,
+        usia_bulan:  usiaBulan,
       }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
-
   } catch (err) {
-    console.error('Error:', err)
     return new Response(
       JSON.stringify({ error: 'Internal server error', detail: err.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }
 })

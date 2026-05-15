@@ -1,6 +1,6 @@
-// supabase/functions/export-laporan-pdf/index.ts
-// Edge Function: Generate laporan PDF Posyandu
-// Deploy: supabase functions deploy export-laporan-pdf
+// supabase/functions/generate-laporan-pdf/index.ts
+// Edge Function: Generate laporan PDF posyandu menggunakan HTML → PDF
+// Deploy: supabase functions deploy generate-laporan-pdf
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -10,45 +10,247 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-function statusLabel(status: string): string {
-  const map: Record<string, string> = {
+// Generate HTML laporan (akan di-convert ke PDF oleh puppeteer atau dikirim sebagai HTML)
+function generateHTMLLaporan(data: {
+  wilayah: { kelurahan: string; kecamatan: string; kabupaten: string; provinsi: string }
+  periode: string
+  kader: { nama: string }
+  statistik: {
+    total_balita: number
+    total_diukur: number
+    normal: number
+    berisiko: number
+    stunting: number
+    wasting: number
+    gizi_buruk: number
+    gizi_lebih: number
+    persen_stunting: number
+  }
+  balita: Array<{
+    nama: string
+    tanggal_lahir: string
+    jenis_kelamin: string
+    usia_bulan: number
+    berat_badan_kg: number
+    tinggi_badan_cm: number
+    status_gizi: string
+    tanggal_ukur: string
+  }>
+  tren: Array<{ bulan: string; persen_stunting: number; total_diukur: number }>
+}): string {
+
+  const statusLabel: Record<string, string> = {
     normal: 'Normal',
-    gizi_kurang: 'Gizi Kurang',
+    berisiko: 'Berisiko',
+    stunting: 'Stunting',
+    wasting: 'Wasting',
     gizi_buruk: 'Gizi Buruk',
     gizi_lebih: 'Gizi Lebih',
-    stunting: 'Stunting',
-    stunting_berat: 'Stunting Berat',
-    wasting: 'Wasting',
-    wasting_berat: 'Wasting Berat',
-    overweight: 'Overweight',
-    obesitas: 'Obesitas',
   }
-  return map[status] || status
-}
 
-function statusColor(status: string): string {
-  if (['stunting_berat', 'gizi_buruk', 'wasting_berat'].includes(status)) return '#dc2626'
-  if (['stunting', 'wasting', 'gizi_kurang'].includes(status)) return '#d97706'
-  if (['overweight', 'obesitas', 'gizi_lebih'].includes(status)) return '#7c3aed'
-  return '#16a34a'
-}
+  const statusColor: Record<string, string> = {
+    normal: '#16a34a',
+    berisiko: '#d97706',
+    stunting: '#dc2626',
+    wasting: '#dc2626',
+    gizi_buruk: '#7f1d1d',
+    gizi_lebih: '#7c3aed',
+  }
 
-function formatTanggal(dateStr: string): string {
-  const d = new Date(dateStr)
-  return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })
-}
+  const formatTanggal = (tgl: string) => {
+    if (!tgl) return '-'
+    return new Date(tgl).toLocaleDateString('id-ID', {
+      day: '2-digit', month: 'long', year: 'numeric'
+    })
+  }
 
-function hitungUmur(tanggalLahir: string, tanggalUkur?: string): string {
-  const lahir = new Date(tanggalLahir)
-  const ukur = tanggalUkur ? new Date(tanggalUkur) : new Date()
-  const bulan = Math.floor(
-    (ukur.getFullYear() - lahir.getFullYear()) * 12 +
-    (ukur.getMonth() - lahir.getMonth())
-  )
-  if (bulan < 12) return `${bulan} bln`
-  const thn = Math.floor(bulan / 12)
-  const sisa = bulan % 12
-  return sisa > 0 ? `${thn} thn ${sisa} bln` : `${thn} thn`
+  const formatBulan = (bulan: string) => {
+    return new Date(bulan).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+  }
+
+  const tabelBalita = data.balita.map((b, i) => `
+    <tr style="background:${i % 2 === 0 ? '#f9fafb' : '#fff'}">
+      <td style="padding:8px;border:1px solid #e5e7eb;text-align:center">${i + 1}</td>
+      <td style="padding:8px;border:1px solid #e5e7eb">${b.nama}</td>
+      <td style="padding:8px;border:1px solid #e5e7eb;text-align:center">${b.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
+      <td style="padding:8px;border:1px solid #e5e7eb;text-align:center">${b.usia_bulan} bln</td>
+      <td style="padding:8px;border:1px solid #e5e7eb;text-align:center">${b.berat_badan_kg} kg</td>
+      <td style="padding:8px;border:1px solid #e5e7eb;text-align:center">${b.tinggi_badan_cm} cm</td>
+      <td style="padding:8px;border:1px solid #e5e7eb;text-align:center">
+        <span style="
+          background:${statusColor[b.status_gizi] || '#6b7280'}20;
+          color:${statusColor[b.status_gizi] || '#6b7280'};
+          padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600
+        ">${statusLabel[b.status_gizi] || b.status_gizi}</span>
+      </td>
+      <td style="padding:8px;border:1px solid #e5e7eb;text-align:center">${formatTanggal(b.tanggal_ukur)}</td>
+    </tr>
+  `).join('')
+
+  const tabelTren = data.tren.map(t => `
+    <tr>
+      <td style="padding:8px;border:1px solid #e5e7eb">${formatBulan(t.bulan)}</td>
+      <td style="padding:8px;border:1px solid #e5e7eb;text-align:center">${t.total_diukur}</td>
+      <td style="padding:8px;border:1px solid #e5e7eb;text-align:center">
+        <span style="color:${t.persen_stunting > 30 ? '#dc2626' : t.persen_stunting > 15 ? '#d97706' : '#16a34a'};font-weight:600">
+          ${t.persen_stunting}%
+        </span>
+      </td>
+    </tr>
+  `).join('')
+
+  return `
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Arial', sans-serif; font-size: 12px; color: #1f2937; padding: 24px; }
+    .header { text-align: center; border-bottom: 3px solid #2D6A4F; padding-bottom: 16px; margin-bottom: 24px; }
+    .logo-row { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 8px; }
+    .logo-placeholder { width: 60px; height: 60px; background: #2D6A4F; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; }
+    h1 { font-size: 16px; font-weight: 700; color: #1a3a2a; }
+    h2 { font-size: 13px; font-weight: 600; color: #2D6A4F; margin: 16px 0 8px; }
+    .subtitle { font-size: 11px; color: #6b7280; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; background: #f9fafb; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb; }
+    .info-item { display: flex; flex-direction: column; gap: 2px; }
+    .info-label { font-size: 10px; color: #6b7280; text-transform: uppercase; font-weight: 600; }
+    .info-value { font-size: 12px; color: #1f2937; font-weight: 500; }
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
+    .stat-card { padding: 12px; border-radius: 8px; text-align: center; border: 1px solid; }
+    .stat-card .num { font-size: 20px; font-weight: 700; }
+    .stat-card .label { font-size: 10px; margin-top: 2px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
+    th { background: #2D6A4F; color: white; padding: 8px; text-align: center; font-weight: 600; }
+    .footer { margin-top: 32px; display: flex; justify-content: flex-end; }
+    .ttd-box { text-align: center; }
+    .ttd-name { font-weight: 700; text-decoration: underline; margin-top: 48px; }
+    .rekomendasi { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: 12px; margin-bottom: 20px; }
+    .rekomendasi h3 { color: #92400e; font-size: 12px; margin-bottom: 8px; }
+    .rekomendasi ul { padding-left: 16px; }
+    .rekomendasi li { color: #78350f; font-size: 11px; margin-bottom: 4px; }
+    @media print { body { padding: 0; } }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo-row">
+      <div class="logo-placeholder">🏥</div>
+      <div>
+        <h1>LAPORAN GIZI BALITA</h1>
+        <h1>POSYANDU / PUSKESMAS</h1>
+      </div>
+    </div>
+    <div class="subtitle">
+      Kelurahan ${data.wilayah.kelurahan} &bull; Kecamatan ${data.wilayah.kecamatan}<br>
+      ${data.wilayah.kabupaten} &bull; ${data.wilayah.provinsi}
+    </div>
+  </div>
+
+  <!-- INFO LAPORAN -->
+  <div class="info-grid">
+    <div class="info-item">
+      <span class="info-label">Periode Laporan</span>
+      <span class="info-value">${data.periode}</span>
+    </div>
+    <div class="info-item">
+      <span class="info-label">Nama Kader</span>
+      <span class="info-value">${data.kader.nama}</span>
+    </div>
+    <div class="info-item">
+      <span class="info-label">Wilayah</span>
+      <span class="info-value">Kel. ${data.wilayah.kelurahan}, Kec. ${data.wilayah.kecamatan}</span>
+    </div>
+    <div class="info-item">
+      <span class="info-label">Tanggal Cetak</span>
+      <span class="info-value">${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+    </div>
+  </div>
+
+  <!-- STATISTIK RINGKASAN -->
+  <h2>📊 Ringkasan Status Gizi</h2>
+  <div class="stat-grid">
+    <div class="stat-card" style="background:#dcfce7;border-color:#86efac">
+      <div class="num" style="color:#16a34a">${data.statistik.total_balita}</div>
+      <div class="label" style="color:#15803d">Total Balita</div>
+    </div>
+    <div class="stat-card" style="background:#fee2e2;border-color:#fca5a5">
+      <div class="num" style="color:#dc2626">${data.statistik.stunting + data.statistik.gizi_buruk}</div>
+      <div class="label" style="color:#b91c1c">Stunting</div>
+    </div>
+    <div class="stat-card" style="background:#fef3c7;border-color:#fde68a">
+      <div class="num" style="color:#d97706">${data.statistik.berisiko}</div>
+      <div class="label" style="color:#b45309">Berisiko</div>
+    </div>
+    <div class="stat-card" style="background:#f3f4f6;border-color:#d1d5db">
+      <div class="num" style="color:#dc2626">${data.statistik.persen_stunting}%</div>
+      <div class="label" style="color:#6b7280">Prevalensi Stunting</div>
+    </div>
+  </div>
+
+  <!-- TREN BULANAN -->
+  ${data.tren.length > 0 ? `
+  <h2>📈 Tren Stunting Bulanan</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Bulan</th>
+        <th>Balita Diukur</th>
+        <th>% Stunting</th>
+      </tr>
+    </thead>
+    <tbody>${tabelTren}</tbody>
+  </table>
+  ` : ''}
+
+  <!-- REKOMENDASI -->
+  <div class="rekomendasi">
+    <h3>⚠️ Rekomendasi Intervensi</h3>
+    <ul>
+      ${data.statistik.persen_stunting > 30 ? '<li><strong>Darurat:</strong> Prevalensi stunting >30% — butuh intervensi segera dari Puskesmas dan Dinas Kesehatan.</li>' : ''}
+      ${data.statistik.persen_stunting > 15 ? '<li>Lakukan pemantauan intensif setiap bulan untuk balita berstatus berisiko.</li>' : ''}
+      <li>Berikan PMT (Pemberian Makanan Tambahan) untuk balita stunting dan berisiko.</li>
+      <li>Edukasi gizi kepada orang tua: MP-ASI bergizi, ASI eksklusif, higienitas.</li>
+      <li>Koordinasi dengan Puskesmas untuk balita dengan status gizi buruk/wasting.</li>
+      ${data.statistik.total_balita - data.statistik.total_diukur > 0 
+        ? `<li>${data.statistik.total_balita - data.statistik.total_diukur} balita belum diukur — lakukan sweeping.</li>` 
+        : ''}
+    </ul>
+  </div>
+
+  <!-- TABEL DATA BALITA -->
+  <h2>👶 Data Balita Individual</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>No</th>
+        <th>Nama Balita</th>
+        <th>JK</th>
+        <th>Usia</th>
+        <th>BB (kg)</th>
+        <th>TB (cm)</th>
+        <th>Status Gizi</th>
+        <th>Tgl Ukur</th>
+      </tr>
+    </thead>
+    <tbody>${tabelBalita || '<tr><td colspan="8" style="text-align:center;padding:16px;color:#6b7280">Belum ada data pengukuran</td></tr>'}</tbody>
+  </table>
+
+  <!-- TANDA TANGAN -->
+  <div class="footer">
+    <div class="ttd-box">
+      <div>${data.wilayah.kelurahan}, ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+      <div style="margin-top:4px;font-size:11px;color:#6b7280">Kader Posyandu,</div>
+      <div class="ttd-name">${data.kader.nama}</div>
+    </div>
+  </div>
+
+</body>
+</html>
+  `
 }
 
 serve(async (req) => {
@@ -57,333 +259,121 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
 
-    // Auth
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
+    const token = authHeader?.replace('Bearer ', '')
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
 
-    const supabaseUser = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: { headers: { Authorization: authHeader } }
-    })
-    const { data: { user } } = await supabaseUser.auth.getUser()
-    if (!user) {
-      return new Response(JSON.stringify({ error: 'Token tidak valid' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Tidak terautentikasi' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+      )
     }
 
     const body = await req.json()
-    const { wilayah_id, bulan_mulai, bulan_selesai, posyandu_id } = body
+    const { wilayah_id, periode_mulai, periode_akhir } = body
+
+    if (!wilayah_id || !periode_mulai || !periode_akhir) {
+      return new Response(
+        JSON.stringify({ error: 'wilayah_id, periode_mulai, dan periode_akhir wajib diisi' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
+
+    // Ambil data wilayah
+    const { data: wilayah } = await supabase
+      .from('wilayah')
+      .select('kelurahan, kecamatan, kabupaten, provinsi')
+      .eq('id', wilayah_id)
+      .single()
 
     // Ambil profil kader
-    const { data: profile } = await supabase
+    const { data: kaderProfile } = await supabase
       .from('profiles')
-      .select('nama, kota, provinsi, kabupaten, kelurahan')
+      .select('nama')
       .eq('id', user.id)
       .single()
 
-    // Ambil data wilayah
-    const { data: wilayah } = wilayah_id
-      ? await supabase.from('wilayah').select('*').eq('id', wilayah_id).single()
-      : { data: null }
+    // Ambil statistik dari view
+    const { data: statWilayah } = await supabase
+      .from('v_statistik_wilayah')
+      .select('*')
+      .eq('wilayah_id', wilayah_id)
+      .single()
 
-    // Ambil data balita + pengukuran terakhir
-    let balitaQuery = supabase
-      .from('balita')
-      .select(`
-        id, nama, tanggal_lahir, jenis_kelamin, rt, rw, nama_ortu,
-        pengukuran (
-          id, tanggal_ukur, berat_kg, tinggi_cm,
-          zscore_bbu, zscore_tbu, zscore_bbtb,
-          status_gizi, created_at
-        )
-      `)
+    // Ambil data balita dengan pengukuran dalam periode
+    const { data: balitaData } = await supabase
+      .from('v_balita_dengan_status')
+      .select('*')
+      .eq('wilayah_id', wilayah_id)
+      .gte('tanggal_ukur', periode_mulai)
+      .lte('tanggal_ukur', periode_akhir)
       .order('nama')
 
-    if (wilayah_id) balitaQuery = balitaQuery.eq('wilayah_id', wilayah_id)
-    if (posyandu_id) balitaQuery = balitaQuery.eq('posyandu_id', posyandu_id)
-
-    const { data: balitaList } = await balitaQuery
-
     // Ambil tren bulanan
-    const { data: tren } = await supabase.rpc('get_tren_gizi', {
-      p_wilayah_id: wilayah_id || null,
-      p_bulan_mulai: bulan_mulai || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      p_bulan_selesai: bulan_selesai || new Date().toISOString().split('T')[0],
+    const { data: trenData } = await supabase
+      .from('v_tren_gizi_bulanan')
+      .select('bulan, persen_stunting, total_diukur')
+      .eq('wilayah_id', wilayah_id)
+      .gte('bulan', new Date(new Date(periode_mulai).setMonth(new Date(periode_mulai).getMonth() - 5)).toISOString())
+      .lte('bulan', periode_akhir)
+      .order('bulan', { ascending: true })
+
+    const periodeLabel = `${new Date(periode_mulai).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })} – ${new Date(periode_akhir).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}`
+
+    // Generate HTML
+    const html = generateHTMLLaporan({
+      wilayah: wilayah || { kelurahan: '-', kecamatan: '-', kabupaten: '-', provinsi: '-' },
+      periode: periodeLabel,
+      kader: { nama: kaderProfile?.nama || 'Kader Posyandu' },
+      statistik: {
+        total_balita: statWilayah?.total_balita || 0,
+        total_diukur: statWilayah?.total_diukur || 0,
+        normal: statWilayah?.jumlah_normal || 0,
+        berisiko: statWilayah?.jumlah_berisiko || 0,
+        stunting: statWilayah?.jumlah_stunting || 0,
+        wasting: statWilayah?.jumlah_wasting || 0,
+        gizi_buruk: statWilayah?.jumlah_gizi_buruk || 0,
+        gizi_lebih: 0,
+        persen_stunting: statWilayah?.persen_stunting || 0,
+      },
+      balita: (balitaData || []).map(b => ({
+        nama: b.nama,
+        tanggal_lahir: b.tanggal_lahir,
+        jenis_kelamin: b.jenis_kelamin,
+        usia_bulan: b.usia_bulan || 0,
+        berat_badan_kg: b.berat_badan_kg || 0,
+        tinggi_badan_cm: b.tinggi_badan_cm || 0,
+        status_gizi: b.status_gizi || 'belum_diukur',
+        tanggal_ukur: b.tanggal_ukur,
+      })),
+      tren: (trenData || []).map(t => ({
+        bulan: t.bulan,
+        persen_stunting: t.persen_stunting || 0,
+        total_diukur: t.total_diukur || 0,
+      })),
     })
 
-    // Hitung ringkasan
-    const totalBalita = balitaList?.length || 0
-    let totalStunting = 0, totalWasting = 0, totalGiziBuruk = 0, totalNormal = 0
-
-    const balitaWithLatest = (balitaList || []).map((b: Record<string, unknown>) => {
-      const pengukuranArr = (b.pengukuran as Record<string, unknown>[]) || []
-      const latest = pengukuranArr.sort((a, b) =>
-        new Date(b.tanggal_ukur as string).getTime() - new Date(a.tanggal_ukur as string).getTime()
-      )[0]
-
-      if (latest) {
-        const s = latest.status_gizi as string
-        if (['stunting', 'stunting_berat'].includes(s)) totalStunting++
-        else if (['wasting', 'wasting_berat'].includes(s)) totalWasting++
-        else if (s === 'gizi_buruk') totalGiziBuruk++
-        else if (s === 'normal') totalNormal++
-      }
-
-      return { ...b, pengukuran_terakhir: latest }
-    })
-
-    const periodeLabel = bulan_mulai && bulan_selesai
-      ? `${formatTanggal(bulan_mulai)} – ${formatTanggal(bulan_selesai)}`
-      : `s/d ${formatTanggal(new Date().toISOString().split('T')[0])}`
-
-    const namaWilayah = wilayah?.nama_kelurahan || profile?.kelurahan || profile?.kota || 'Semua Wilayah'
-    const namaKader = profile?.nama || 'Kader Posyandu'
-
-    // ─────────────────────────────────────────
-    // Generate HTML untuk PDF
-    // ─────────────────────────────────────────
-    const html = `<!DOCTYPE html>
-<html lang="id">
-<head>
-<meta charset="UTF-8">
-<title>Laporan Posyandu – ${namaWilayah}</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Arial', sans-serif; font-size: 11px; color: #1a1a1a; background: #fff; }
-  
-  .header { 
-    background: linear-gradient(135deg, #1B4332 0%, #2D6A4F 100%);
-    color: white; padding: 24px 32px; display: flex;
-    align-items: center; justify-content: space-between;
-  }
-  .header-left h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
-  .header-left p { font-size: 11px; opacity: 0.85; }
-  .header-right { text-align: right; font-size: 10px; opacity: 0.85; }
-  
-  .kop { padding: 16px 32px; border-bottom: 2px solid #2D6A4F; margin-bottom: 16px; }
-  .kop h2 { font-size: 15px; color: #1B4332; }
-  .kop p { font-size: 10px; color: #555; margin-top: 2px; }
-  
-  .summary { 
-    display: grid; grid-template-columns: repeat(4, 1fr); 
-    gap: 12px; padding: 0 32px 20px; 
-  }
-  .summary-card {
-    border: 1.5px solid #e0e0e0; border-radius: 8px;
-    padding: 12px; text-align: center;
-  }
-  .summary-card .num { font-size: 24px; font-weight: 700; }
-  .summary-card .lbl { font-size: 9px; color: #666; margin-top: 2px; }
-  .num-green { color: #16a34a; }
-  .num-red { color: #dc2626; }
-  .num-yellow { color: #d97706; }
-  .num-blue { color: #2563eb; }
-  
-  .section { padding: 0 32px 20px; }
-  .section h3 { font-size: 12px; font-weight: 700; color: #1B4332; 
-    border-left: 3px solid #2D6A4F; padding-left: 8px; margin-bottom: 12px; }
-  
-  table { width: 100%; border-collapse: collapse; font-size: 10px; }
-  th { background: #1B4332; color: white; padding: 7px 8px; text-align: left; font-weight: 600; }
-  td { padding: 6px 8px; border-bottom: 1px solid #f0f0f0; }
-  tr:nth-child(even) td { background: #f9fafb; }
-  
-  .badge {
-    display: inline-block; padding: 2px 8px; border-radius: 99px;
-    font-size: 9px; font-weight: 600; color: white;
-  }
-  
-  .tren-table th { background: #2D6A4F; }
-  
-  .footer {
-    margin-top: 24px; padding: 16px 32px;
-    border-top: 1px solid #e0e0e0;
-    display: flex; justify-content: space-between;
-    font-size: 9px; color: #888;
-  }
-  .ttd { text-align: right; }
-  .ttd p { font-size: 10px; color: #333; }
-  .ttd .garis { margin-top: 48px; border-top: 1px solid #333; width: 160px; margin-left: auto; padding-top: 4px; }
-  
-  @media print {
-    body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-    .page-break { page-break-before: always; }
-  }
-</style>
-</head>
-<body>
-
-<!-- HEADER -->
-<div class="header">
-  <div class="header-left">
-    <h1>🏥 LAPORAN POSYANDU</h1>
-    <p>Sistem Pemantauan Gizi Balita Terintegrasi</p>
-  </div>
-  <div class="header-right">
-    <p>Dicetak: ${formatTanggal(new Date().toISOString().split('T')[0])}</p>
-    <p>Periode: ${periodeLabel}</p>
-    <p>Wilayah: ${namaWilayah}</p>
-  </div>
-</div>
-
-<!-- INFO LAPORAN -->
-<div class="kop">
-  <h2>Laporan Pemantauan Gizi Balita – ${namaWilayah}</h2>
-  <p>Kecamatan: ${wilayah?.nama_kecamatan || '-'} | Kabupaten: ${wilayah?.nama_kabupaten || profile?.kabupaten || '-'} | Provinsi: ${profile?.provinsi || '-'}</p>
-  <p>Dibuat oleh: ${namaKader} | Periode: ${periodeLabel}</p>
-</div>
-
-<!-- RINGKASAN STATS -->
-<div class="summary">
-  <div class="summary-card">
-    <div class="num num-blue">${totalBalita}</div>
-    <div class="lbl">Total Balita</div>
-  </div>
-  <div class="summary-card">
-    <div class="num num-green">${totalNormal}</div>
-    <div class="lbl">Status Normal</div>
-  </div>
-  <div class="summary-card">
-    <div class="num num-red">${totalStunting}</div>
-    <div class="lbl">Stunting</div>
-  </div>
-  <div class="summary-card">
-    <div class="num num-yellow">${totalWasting + totalGiziBuruk}</div>
-    <div class="lbl">Wasting / Gizi Buruk</div>
-  </div>
-</div>
-
-<!-- TABEL DATA BALITA -->
-<div class="section">
-  <h3>Data Rekap Balita</h3>
-  <table>
-    <thead>
-      <tr>
-        <th>No</th>
-        <th>Nama Balita</th>
-        <th>L/P</th>
-        <th>Umur</th>
-        <th>Tgl Ukur</th>
-        <th>BB (kg)</th>
-        <th>TB (cm)</th>
-        <th>Z-BBU</th>
-        <th>Z-TBU</th>
-        <th>Z-BBTB</th>
-        <th>Status Gizi</th>
-        <th>RT/RW</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${balitaWithLatest.map((b, i) => {
-        const p = b.pengukuran_terakhir as Record<string, unknown> | undefined
-        const status = p ? (p.status_gizi as string) : '-'
-        const color = p ? statusColor(status) : '#888'
-        return `
-        <tr>
-          <td>${i + 1}</td>
-          <td><strong>${b.nama}</strong>${b.nama_ortu ? `<br><span style="color:#888;font-size:9px">${b.nama_ortu}</span>` : ''}</td>
-          <td>${b.jenis_kelamin}</td>
-          <td>${hitungUmur(b.tanggal_lahir as string, p?.tanggal_ukur as string)}</td>
-          <td>${p ? formatTanggal(p.tanggal_ukur as string) : '-'}</td>
-          <td>${p ? p.berat_kg : '-'}</td>
-          <td>${p ? p.tinggi_cm : '-'}</td>
-          <td>${p?.zscore_bbu ?? '-'}</td>
-          <td>${p?.zscore_tbu ?? '-'}</td>
-          <td>${p?.zscore_bbtb ?? '-'}</td>
-          <td>${p ? `<span class="badge" style="background:${color}">${statusLabel(status)}</span>` : '-'}</td>
-          <td>${b.rt ? `${b.rt}/${b.rw}` : '-'}</td>
-        </tr>`
-      }).join('')}
-    </tbody>
-  </table>
-</div>
-
-<!-- TREN BULANAN -->
-${tren && tren.length > 0 ? `
-<div class="section page-break">
-  <h3>Tren Gizi Bulanan</h3>
-  <table class="tren-table">
-    <thead>
-      <tr>
-        <th>Bulan</th>
-        <th>Total Pengukuran</th>
-        <th>Normal</th>
-        <th>Stunting</th>
-        <th>Wasting</th>
-        <th>% Stunting</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${tren.map((t: Record<string, unknown>) => `
-      <tr>
-        <td>${t.bulan}</td>
-        <td>${t.total_pengukuran}</td>
-        <td style="color:#16a34a;font-weight:600">${t.total_normal}</td>
-        <td style="color:#dc2626;font-weight:600">${t.total_stunting}</td>
-        <td style="color:#d97706;font-weight:600">${t.total_wasting}</td>
-        <td>
-          <span style="color:${Number(t.persen_stunting) >= 30 ? '#dc2626' : Number(t.persen_stunting) >= 15 ? '#d97706' : '#16a34a'};font-weight:700">
-            ${t.persen_stunting}%
-          </span>
-        </td>
-      </tr>`).join('')}
-    </tbody>
-  </table>
-</div>
-` : ''}
-
-<!-- REKOMENDASI -->
-<div class="section">
-  <h3>Rekomendasi Intervensi</h3>
-  <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:12px;font-size:10px;line-height:1.8">
-    ${totalGiziBuruk > 0 ? `<p>🔴 <strong>PRIORITAS TINGGI:</strong> Terdapat <strong>${totalGiziBuruk} balita gizi buruk</strong> — segera rujuk ke Puskesmas untuk penanganan intensif dan pemberian PMT (Pemberian Makanan Tambahan) khusus.</p>` : ''}
-    ${totalStunting > 0 ? `<p>🟡 <strong>STUNTING:</strong> ${totalStunting} balita terdeteksi stunting (${Math.round(totalStunting/Math.max(totalBalita,1)*100)}%) — lakukan konseling gizi, pemantauan ketat bulanan, dan koordinasi dengan tenaga kesehatan Puskesmas.</p>` : ''}
-    ${totalWasting > 0 ? `<p>🟠 <strong>WASTING:</strong> ${totalWasting} balita dengan status wasting — tingkatkan asupan kalori, pantau BB setiap 2 minggu, dan pertimbangkan pemberian PMT.</p>` : ''}
-    ${totalNormal === totalBalita ? `<p>🟢 <strong>BAIK:</strong> Seluruh balita dalam status gizi normal. Pertahankan dengan pemantauan rutin dan edukasi MPASI bergizi.</p>` : ''}
-    <p>📋 Laporkan data ini ke Puskesmas setempat dan koordinasikan program intervensi gizi sesuai standar Kemenkes RI.</p>
-  </div>
-</div>
-
-<!-- FOOTER -->
-<div class="footer">
-  <div>
-    <p>Dokumen ini dibuat otomatis oleh Sistem Informasi Gizi Balita</p>
-    <p>Standar WHO Child Growth Standards 2006 | Kemenkes RI</p>
-  </div>
-  <div class="ttd">
-    <p>Mengetahui, Kader Posyandu</p>
-    <div class="garis">${namaKader}</div>
-  </div>
-</div>
-
-</body>
-</html>`
-
-    // Return HTML (frontend akan convert ke PDF dengan print/window.print atau Puppeteer)
-    // Untuk produksi, bisa gunakan Puppeteer via browser.deno.dev
+    // Return HTML (frontend akan print/save sebagai PDF menggunakan window.print() atau library)
     return new Response(html, {
-      status: 200,
       headers: {
         ...corsHeaders,
         'Content-Type': 'text/html; charset=utf-8',
-        'X-Laporan-Wilayah': namaWilayah,
-        'X-Total-Balita': String(totalBalita),
-      }
+        'X-Laporan-Wilayah': wilayah?.kelurahan || '',
+        'X-Laporan-Periode': periodeLabel,
+      },
     })
 
-  } catch (err) {
-    console.error('Export error:', err)
+  } catch (error) {
+    console.error('Error:', error)
     return new Response(
-      JSON.stringify({ error: 'Internal server error', detail: err.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: 'Internal server error', detail: error.message }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }
 })
