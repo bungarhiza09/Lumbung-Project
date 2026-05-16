@@ -8,6 +8,7 @@ export const POIN_AKSI = {
   input_balita: 20,
   upload_video: 10,
   upload_recipe : 10,
+  upload_kelas: 10,
 }
 
 // Fungsi utama: tambah poin user

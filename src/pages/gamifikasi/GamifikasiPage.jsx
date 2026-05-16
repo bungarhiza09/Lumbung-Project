@@ -16,6 +16,7 @@ const AKSI_LABEL = {
   input_balita:    { icon: '👶', label: 'Input data balita' },
   upload_video:    { icon: '🎬', label: 'Upload video edukasi' },
   upload_recipe:   { icon: '📖', label: 'Upload resep' },
+  upload_kelas:    { icon: '👩‍🏫', label: 'Menambahkan topik kuis'},
 }
 
 // Misi hardcoded — aktif selalu sebagai fallback & demo
@@ -486,6 +487,7 @@ function HistoryTab({ profile }) {
     volunteer_relay: { bg: 'bg-green-50 border-green-100',    dot: 'bg-green-400' },
     upload_video:    { bg: 'bg-purple-50 border-purple-100',  dot: 'bg-purple-400' },
     upload_recipe:   { bg: 'bg-violet-50 border-violet-100',  dot: 'bg-violet-400' },
+    upload_kelas:    { bg: 'bg-yellow-50 border-yellow-100',  dot: 'bg-yellow-400' },
   }
 
   return (
