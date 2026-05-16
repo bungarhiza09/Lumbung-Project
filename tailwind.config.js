@@ -5,7 +5,9 @@ export default {
     "./src/**/*.{js,jsx,ts,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {keyframes: {
+      shrink: { from: { width: '100%' }, to: { width: '0%' }},
+    }},
   },
   plugins: [],
 }

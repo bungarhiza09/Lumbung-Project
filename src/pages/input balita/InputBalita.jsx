@@ -6,6 +6,8 @@ import Layout from '../../components/Layout'
 import LocationPicker from '../../components/LocationPicker'
 import { useTambahBalita, useInputPengukuran, useImportBalita } from '../../hooks/useBalita'
 import { supabase } from '../../lib/supabase'
+import { ToastContainer } from '../../components/Toast'
+import { useToast } from '../../hooks/useToast'
 
 // ─── Konstanta ────────────────────────────────────────────────
 const STATUS_CONFIG = {
@@ -172,14 +174,14 @@ function FormInputManual() {
   const navigate = useNavigate()
   const { tambah, loading: loadingTambah } = useTambahBalita()
   const { simpan, loading: loadingUkur, result: hasilUkur } = useInputPengukuran()
-
+  const { toasts, toast, removeToast } = useToast()
   const [step, setStep]         = useState(1) // 1=data balita, 2=pengukuran
   const [balitaId, setBalitaId] = useState(null)
   const [saved, setSaved]       = useState(false)
 
   // Form balita
   const [form, setForm] = useState({
-    nama: '', nik: '', tanggal_lahir: '', jenis_kelamin: 'L',
+    nama: '', nik_orang_tua: '', tanggal_lahir: '', jenis_kelamin: 'L',
     nama_orang_tua: '', no_hp_orang_tua: '', rt: '', rw: '',
   })
   // Lokasi dari LocationPicker
@@ -227,7 +229,7 @@ function FormInputManual() {
 
     const res = await tambah({
       nama:           form.nama.trim(),
-      nik:            form.nik.trim() || null,
+      nik_orang_tua:  form.nik_orang_tua.trim() || null,
       tanggal_lahir:  form.tanggal_lahir,
       jenis_kelamin:  form.jenis_kelamin,
       nama_orang_tua: form.nama_orang_tua.trim() || null,
@@ -239,8 +241,9 @@ function FormInputManual() {
     })
 
     if (res.success) { setBalitaId(res.data.id); setStep(2) }
-    else setErrors({ submit: res.error })
-  }
+    else {
+    toast({ type: 'error', title: 'Gagal menyimpan', message: res.error })
+  } } 
 
   const handleSimpanUkur = async () => {
     if (!ukur.berat_badan_kg || !ukur.tinggi_badan_cm) {
@@ -255,8 +258,9 @@ function FormInputManual() {
       catatan:          ukur.catatan,
     })
     if (res.success) setSaved(true)
-    else setErrors({ ukur: res.error })
-  }
+  else {
+    toast({ type: 'error', title: 'Gagal menyimpan pengukuran', message: res.error })
+  } }
 
   // ── Selesai ──
   if (saved) return (
@@ -282,6 +286,7 @@ function FormInputManual() {
 
   return (
     <div>
+      <ToastContainer toasts={toasts} onClose={removeToast} />
       {/* Step indicator */}
       <div className="flex items-center gap-2 mb-6">
         {[{ n:1, label:'Data Balita' }, { n:2, label:'Pengukuran' }].map(({ n, label }, i) => (
@@ -299,7 +304,7 @@ function FormInputManual() {
       {step === 1 && (
         <div className="space-y-4">
           <InputField label="Nama Lengkap Balita *" value={form.nama} onChange={set('nama')} error={errors.nama} placeholder="Contoh: Andi Kurniawan" />
-          <InputField label="NIK (opsional)" value={form.nik} onChange={set('nik')} placeholder="16 digit NIK" />
+          <InputField label="NIK Orang Tua" value={form.nik_orang_tua} onChange={set('nik_orang_tua')} placeholder="16 digit NIK Ayah/Ibu" />
 
           <div className="grid grid-cols-2 gap-3">
             <InputField label="Tanggal Lahir *" type="date" value={form.tanggal_lahir} onChange={set('tanggal_lahir')} error={errors.tanggal_lahir} />

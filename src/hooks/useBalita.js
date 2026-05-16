@@ -81,7 +81,7 @@ export function useTambahBalita() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       // Sesuaikan nama kolom dengan schema: nama_ortu, no_hp_ortu
-      const { nama, nik, tanggal_lahir, jenis_kelamin,
+      const { nama, nik_orang_tua, tanggal_lahir, jenis_kelamin,
               nama_orang_tua, no_hp_orang_tua, alamat,
               rt, rw, wilayah_id, posyandu_id } = payload
 
@@ -89,11 +89,11 @@ export function useTambahBalita() {
         .from('balita')
         .insert({
           nama,
-          nik:          nik || null,
+          nik_orang_tua:  nik_orang_tua || null,
           tanggal_lahir,
           jenis_kelamin,
-          nama_ortu:    nama_orang_tua || null,  // kolom asli: nama_ortu
-          no_hp_ortu:   no_hp_orang_tua || null, // kolom asli: no_hp_ortu
+          nama_orang_tua:    nama_orang_tua || null,  // kolom asli: nama_ortu
+          no_hp_orang_tua:   no_hp_orang_tua || null, // kolom asli: no_hp_ortu
           alamat:       alamat || null,
           rt:           rt || null,
           rw:           rw || null,

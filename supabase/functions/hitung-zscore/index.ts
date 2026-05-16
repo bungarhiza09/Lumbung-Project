@@ -174,12 +174,12 @@ serve(async (req) => {
       .insert({
         balita_id,
         tanggal_ukur:      tglUkur.toISOString().split('T')[0],
-        berat_kg:          berat_badan_kg,   // kolom asli: berat_kg
-        tinggi_cm:         tinggi_badan_cm,  // kolom asli: tinggi_cm
+        berat_badan_kg:    berat_badan_kg,   
+        tinggi_badan_cm:   tinggi_badan_cm,  
         lingkar_kepala_cm: lingkar_kepala_cm || null,
-        zscore_bbu:        zBBU,             // kolom asli: zscore_bbu
-        zscore_tbu:        zTBU,             // kolom asli: zscore_tbu
-        zscore_bbtb:       zBBTB,            // kolom asli: zscore_bbtb
+        zscore_bb_u:       zBBU,             
+        zscore_tb_u:       zTBU,             
+        zscore_bb_tb:      zBBTB,            
         status_gizi:       statusGizi,
         catatan:           catatan || null,
         kader_id:          user.id,
