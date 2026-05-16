@@ -25,42 +25,37 @@ export default function ForumPage() {
     setCategories(data || [])
   }
 
-  async function fetchMyLikes() {
-    const { data } = await supabase
-      .from('forum_likes').select('post_id').eq('user_id', user.id)
-    setLikedPosts(new Set(data?.map(l => l.post_id) || []))
-  }
-
   async function fetchPosts() {
     setLoading(true)
     let query = supabase
       .from('forum_posts')
-      .select('*, forum_categories(name, icon)')
+      .select(`*, forum_categories(name, icon)`)
       .order('created_at', { ascending: false })
     if (activeCategory) query = query.eq('category_id', activeCategory)
-
+    
     const { data, error } = await query
-    if (error) { console.error(error); setLoading(false); return }
+    
+    if (error) {
+      console.error('Forum error:', error)
+      setLoading(false)
+      return
+    }
 
+    // Ambil profil user secara terpisah
     if (data && data.length > 0) {
-      // Ambil semua user_id unik dari posts
       const userIds = [...new Set(data.map(p => p.user_id).filter(Boolean))]
-
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, nama, avatar_url')
         .in('id', userIds)
 
-      // Buat map id → profil
       const profileMap = {}
       profiles?.forEach(p => { profileMap[p.id] = p })
 
-      // Gabungkan profil ke setiap post
       const postsWithProfile = data.map(post => ({
         ...post,
-        author: profileMap[post.user_id] || { nama: 'Pengguna' }
+        profiles: profileMap[post.user_id] || null
       }))
-
       setPosts(postsWithProfile)
     } else {
       setPosts([])
@@ -68,58 +63,44 @@ export default function ForumPage() {
     setLoading(false)
   }
 
-  async function toggleLike(e, post) {
-    e.stopPropagation()
+  async function fetchMyLikes() {
+    const { data } = await supabase
+      .from('forum_likes')
+      .select('post_id')
+      .eq('user_id', user.id)
+    setLikedPosts(new Set(data?.map(l => l.post_id) || []))
+  }
+
+  async function toggleLike(post) {
     if (!user) return
-
     const isLiked = likedPosts.has(post.id)
-
-    // Update UI optimistis dulu
-    setLikedPosts(prev => {
-      const s = new Set(prev)
-      isLiked ? s.delete(post.id) : s.add(post.id)
-      return s
-    })
-    setPosts(prev => prev.map(p =>
-      p.id === post.id
-        ? { ...p, likes_count: isLiked ? Math.max(0, p.likes_count - 1) : p.likes_count + 1 }
-        : p
-    ))
-
-    // Update ke database — trigger otomatis update likes_count
     if (isLiked) {
-      await supabase.from('forum_likes')
-        .delete()
-        .match({ post_id: post.id, user_id: user.id })
+      await supabase.from('forum_likes').delete().match({ post_id: post.id, user_id: user.id })
+      setLikedPosts(prev => { const s = new Set(prev); s.delete(post.id); return s })
     } else {
-      await supabase.from('forum_likes')
-        .insert({ post_id: post.id, user_id: user.id })
+      await supabase.from('forum_likes').insert({ post_id: post.id, user_id: user.id })
+      setLikedPosts(prev => new Set([...prev, post.id]))
     }
+    // Trigger otomatis update likes_count via DB trigger
+    fetchPosts()
   }
 
   if (selected) return (
-    <PostDetail
-      post={selected}
-      currentUser={user}
-      currentProfile={profile}
-      onBack={() => { setSelected(null); fetchPosts() }}
-    />
+    <PostDetail post={selected} currentUser={user} currentProfile={profile}
+      onBack={() => { setSelected(null); fetchPosts() }} />
   )
 
   return (
     <div>
-      {/* Header + Tombol */}
-      <div className="flex items-center justify-between mb-4 gap-2">
-        <div className="bg-[#f0faf4] rounded-2xl p-3 flex-1 border border-[#b7e4cc]">
+      <div className="flex items-center justify-between mb-4">
+        <div className="bg-[#f0faf4] rounded-2xl p-3 flex-1 border border-[#b7e4cc] mr-2">
           <p className="text-xs font-semibold text-[#2D6A4F] mb-0.5">👥 Forum Komunitas</p>
           <p className="text-xs text-[#5a7a6a]">Diskusi dan tanya jawab seputar gizi.</p>
         </div>
         {user && (
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="flex-shrink-0 bg-[#2D6A4F] hover:bg-[#235c43] text-white text-xs font-semibold px-3 py-2 rounded-2xl flex items-center gap-1 transition-all"
-          >
-            <span>+</span> Tanya
+          <button onClick={() => setShowForm(!showForm)}
+            className="flex-shrink-0 bg-[#2D6A4F] text-white text-xs font-semibold px-3 py-2 rounded-2xl flex items-center gap-1">
+            <span className="text-base">+</span> Tanya
           </button>
         )}
       </div>
@@ -138,21 +119,16 @@ export default function ForumPage() {
       <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
         <button onClick={() => setActiveCategory(null)}
           className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap border font-medium transition-all ${
-            !activeCategory ? 'bg-[#2D6A4F] text-white border-[#2D6A4F]' : 'bg-white text-[#4a4a3a] border-[#e8e4db] hover:bg-[#f0faf4]'
-          }`}>
-          Semua
-        </button>
+            !activeCategory ? 'bg-[#2D6A4F] text-white border-[#2D6A4F]' : 'bg-white text-[#4a4a3a] border-[#e8e4db]'
+          }`}>Semua</button>
         {categories.map(c => (
           <button key={c.id} onClick={() => setActiveCategory(c.id)}
             className={`text-xs px-3 py-1.5 rounded-full whitespace-nowrap border font-medium transition-all ${
-              activeCategory === c.id ? 'bg-[#2D6A4F] text-white border-[#2D6A4F]' : 'bg-white text-[#4a4a3a] border-[#e8e4db] hover:bg-[#f0faf4]'
-            }`}>
-            {c.icon} {c.name}
-          </button>
+              activeCategory === c.id ? 'bg-[#2D6A4F] text-white border-[#2D6A4F]' : 'bg-white text-[#4a4a3a] border-[#e8e4db]'
+            }`}>{c.icon} {c.name}</button>
         ))}
       </div>
 
-      {/* Loading */}
       {loading ? (
         <div className="space-y-3">
           {[1,2,3].map(i => (
@@ -170,20 +146,17 @@ export default function ForumPage() {
         <div className="text-center py-10">
           <p className="text-4xl mb-2">💬</p>
           <p className="text-sm font-medium text-[#4a4a3a]">Belum ada diskusi</p>
-          <p className="text-xs text-[#9a9a8a] mt-1">Jadilah yang pertama bertanya!</p>
         </div>
       ) : (
         <div className="space-y-3">
           {posts.map(post => {
             const isLiked = likedPosts.has(post.id)
-            const authorName = post.author?.nama || 'Pengguna'
-            const authorAvatar = post.author?.avatar_url
+            const authorName = post.profiles?.nama || 'Pengguna'
+            const authorAvatar = post.profiles?.avatar_url
 
             return (
-              <div key={post.id}
-                className="border border-[#e8e4db] rounded-2xl p-4 bg-white hover:shadow-sm hover:border-[#b7e4cc] transition-all">
-
-                {/* Author */}
+              <div key={post.id} className="border border-[#e8e4db] rounded-2xl p-4 bg-white hover:shadow-sm transition-all">
+                {/* Author info */}
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-8 h-8 rounded-full bg-[#2D6A4F] flex items-center justify-center text-white text-xs font-bold overflow-hidden flex-shrink-0">
                     {authorAvatar
@@ -191,41 +164,35 @@ export default function ForumPage() {
                       : authorName[0]?.toUpperCase()
                     }
                   </div>
-                  <div className="flex-1">
+                  <div>
                     <p className="text-xs font-semibold text-[#1a3a2a]">{authorName}</p>
                     <p className="text-xs text-[#9a9a8a]">
-                      {new Date(post.created_at).toLocaleDateString('id-ID', {
-                        day: 'numeric', month: 'short', year: 'numeric'
-                      })}
+                      {new Date(post.created_at).toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' })}
                     </p>
                   </div>
                   {post.forum_categories && (
-                    <span className="text-xs bg-[#f0faf4] text-[#2D6A4F] border border-[#b7e4cc] px-2 py-0.5 rounded-full flex-shrink-0">
+                    <span className="ml-auto text-xs bg-[#f0faf4] text-[#2D6A4F] border border-[#b7e4cc] px-2 py-0.5 rounded-full">
                       {post.forum_categories.icon} {post.forum_categories.name}
                     </span>
                   )}
                 </div>
 
                 {/* Konten */}
-                <div onClick={() => setSelected(post)} className="cursor-pointer mb-3">
+                <div onClick={() => setSelected(post)} className="cursor-pointer">
                   <p className="text-sm font-semibold text-[#1a3a2a] mb-1">{post.title}</p>
                   <p className="text-xs text-[#7a8a7a] line-clamp-2 leading-relaxed">{post.content}</p>
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center gap-4 pt-3 border-t border-[#f0ece4]">
-                  <button
-                    onClick={(e) => toggleLike(e, post)}
+                <div className="flex items-center gap-4 mt-3 pt-3 border-t border-[#f0ece4]">
+                  <button onClick={() => toggleLike(post)}
                     className={`flex items-center gap-1.5 text-xs font-medium transition-all ${
                       isLiked ? 'text-red-500' : 'text-[#9a9a8a] hover:text-red-400'
-                    }`}
-                  >
+                    }`}>
                     {isLiked ? '❤️' : '🤍'} {post.likes_count || 0}
                   </button>
-                  <button
-                    onClick={() => setSelected(post)}
-                    className="flex items-center gap-1.5 text-xs text-[#9a9a8a] hover:text-[#2D6A4F] transition-all"
-                  >
+                  <button onClick={() => setSelected(post)}
+                    className="flex items-center gap-1.5 text-xs text-[#9a9a8a] hover:text-[#2D6A4F] transition-all">
                     💬 {post.comments_count || 0} komentar
                   </button>
                   {post.is_expert_answered && (
@@ -341,8 +308,8 @@ function PostDetail({ post, currentUser, currentProfile, onBack }) {
     setLoading(false)
   }
 
-  const postAuthorName = post.author?.nama || 'Pengguna'
-  const postAuthorAvatar = post.author?.avatar_url
+  const postAuthorName = post.profiles?.nama || 'Pengguna'
+  const postAuthorAvatar = post.profiles?.avatar_url
 
   return (
     <div>

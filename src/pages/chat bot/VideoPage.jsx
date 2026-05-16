@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+import { tambahPoin } from '../../lib/poinHelper'
 
 const CATEGORIES = ['Semua', 'MPASI', 'Balita', 'Ibu Hamil', 'Kader Posyandu', 'Umum']
 
@@ -16,6 +17,7 @@ export default function VideoPage() {
   const [selected, setSelected] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [showSuccess, setShowSuccess] = useState(false)
 
   useEffect(() => { fetchVideos() }, [category])
 
@@ -28,7 +30,57 @@ export default function VideoPage() {
     setLoading(false)
   }
 
-  if (showForm) return <TambahVideoForm onBack={() => { setShowForm(false); fetchVideos() }} />
+  if (showForm) {
+    return (
+      <>
+        <TambahVideoForm
+          onSuccess={() => {
+            setShowSuccess(true)
+            fetchVideos()
+
+            setTimeout(() => {
+              setShowSuccess(false)
+            }, 3000)
+          }}
+          onBack={() => {
+            setShowForm(false)
+            fetchVideos()
+          }}
+        />
+
+        {/* Success Popup */}
+        {showSuccess && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+            <div className="bg-white rounded-3xl p-5 w-full max-w-sm shadow-2xl animate-[fadeIn_.2s_ease]">
+              <div className="w-16 h-16 rounded-full bg-[#f0faf4] flex items-center justify-center text-3xl mx-auto mb-4">
+                🎉
+              </div>
+
+              <h3 className="text-base font-bold text-center text-[#1a3a2a]">
+                Video Berhasil Ditambahkan!
+              </h3>
+
+              <p className="text-sm text-[#6b7b70] text-center mt-2 leading-relaxed">
+                Terima kasih sudah berbagi edukasi 🎬
+                <br />
+                Kamu mendapat <span className="font-bold text-[#2D6A4F]">+10 poin</span>
+              </p>
+
+              <button
+                onClick={() => {
+                  setShowSuccess(false)
+                  setShowForm(false)
+                }}
+                className="w-full mt-5 bg-[#2D6A4F] hover:bg-[#235c43] text-white py-3 rounded-2xl text-sm font-semibold transition-all"
+              >
+                Oke
+              </button>
+            </div>
+          </div>
+        )}
+      </>
+    )
+  }
 
   return (
     <div>
@@ -36,7 +88,13 @@ export default function VideoPage() {
       <div className="flex items-center justify-between mb-4 gap-2">
         <div className="bg-[#f0faf4] rounded-2xl p-3 flex-1 border border-[#b7e4cc]">
           <p className="text-xs font-semibold text-[#2D6A4F] mb-0.5">🎬 Video Edukasi Gizi</p>
-          <p className="text-xs text-[#5a7a6a]">Pelajari gizi dari para ahli melalui video singkat.</p>
+          <p className="text-xs text-[#5a7a6a]">
+            Pelajari gizi dari para ahli melalui video singkat.
+          </p>
+
+          <div className="mt-2 inline-flex items-center gap-1 bg-[#fff7d6] text-[#8a6d1f] border border-[#ffe58f] px-2 py-1 rounded-full text-[11px] font-semibold">
+            ⭐ Upload video = +10 poin
+          </div>
         </div>
         {user && (
           <button
@@ -155,7 +213,7 @@ export default function VideoPage() {
 }
 
 // ─── Form Tambah Video ───────────────────────────────────────
-function TambahVideoForm({ onBack }) {
+function TambahVideoForm({ onBack, onSuccess }) {
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({
@@ -165,19 +223,37 @@ function TambahVideoForm({ onBack }) {
 
   async function handleSubmit() {
     if (!form.title || !form.youtube_url) return
+
     setLoading(true)
-    await supabase.from('education_videos').insert({
+
+    const { error } = await supabase.from('education_videos').insert({
       title: form.title,
       description: form.description,
       youtube_url: form.youtube_url,
       category: form.category,
       expert_name: form.expert_name,
       expert_title: form.expert_title,
-      duration_minutes: form.duration_minutes ? parseInt(form.duration_minutes) : null,
+      duration_minutes: form.duration_minutes
+        ? parseInt(form.duration_minutes)
+        : null,
       created_by: user?.id,
     })
+
+    if (!error) {
+      await tambahPoin(
+        user.id,
+        'upload_video',
+        `Upload video edukasi: ${form.title}`
+      )
+
+      onSuccess?.()
+
+      setTimeout(() => {
+        onBack?.()
+      }, 5000)
+    }
+
     setLoading(false)
-    onBack()
   }
 
   const inputClass = "w-full px-3 py-2.5 rounded-xl border border-[#e8e4db] bg-[#faf9f7] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 focus:border-[#2D6A4F] transition-all"

@@ -2,8 +2,58 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import Layout from '../../components/Layout'
+import { useNavigate } from 'react-router-dom'
 
 const HARI = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
+const HARI_JS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
+
+function JadwalHariIni({ jadwal, userId, onRefresh }) {
+  const navigate = useNavigate()
+  const hariIni = HARI_JS[new Date().getDay()]
+  const jadwalHariIni = jadwal.filter(j => j.aktif && j.hari?.includes(hariIni))
+
+  async function handlePostingSekarang(item) {
+    // Insert donasi langsung dari data jadwal
+    const { data: profil } = await supabase
+      .from('profiles').select('kota, kabupaten, kecamatan').eq('id', userId).single()
+    await supabase.from('donasi').insert({
+      donor_id: userId,
+      nama_makanan: item.nama_makanan,
+      jumlah_porsi: item.jumlah_porsi,
+      status: 'tersedia',
+      kota: profil?.kota,
+      kabupaten: profil?.kabupaten,
+      kecamatan: profil?.kecamatan,
+      deskripsi: `Donasi rutin dari jadwal: ${item.nama_makanan}`,
+      expired_at: new Date(Date.now() + 4 * 3600000).toISOString(), // 4 jam dari sekarang
+    })
+    navigate('/food-rescue')
+  }
+
+  if (jadwalHariIni.length === 0) return null
+
+  return (
+    <div className="bg-[#fef3e7] border border-[#f9d4a7] rounded-2xl p-4 mb-4">
+      <p className="text-xs font-semibold text-[#d4720a] mb-2">🔔 Jadwal Hari Ini ({hariIni})</p>
+      <div className="space-y-2">
+        {jadwalHariIni.map(item => (
+          <div key={item.id} className="flex items-center justify-between bg-white rounded-xl px-3 py-2.5 border border-[#f9d4a7]">
+            <div>
+              <p className="text-xs font-semibold text-[#1a3a2a]">{item.nama_makanan}</p>
+              <p className="text-[10px] text-[#9a9a8a]">{item.jumlah_porsi} porsi · jam {item.jam}</p>
+            </div>
+            <button
+              onClick={() => handlePostingSekarang(item)}
+              className="text-xs bg-[#F4A261] text-white px-3 py-1.5 rounded-xl font-semibold"
+            >
+              📤 Posting
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function JadwalDonasi() {
   const { user } = useAuth()
@@ -70,7 +120,7 @@ export default function JadwalDonasi() {
 
   return (
     <Layout>
-      <div className="max-w-lg mx-auto">
+      <div className="w-full px-4">
 
         {/* Header */}
         <div className="mb-6">
@@ -78,18 +128,22 @@ export default function JadwalDonasi() {
           <p className="text-sm text-[#7a8a7a] mt-1">Set donasi otomatis berulang setiap minggu</p>
         </div>
 
-        {/* Info */}
-        <div className="bg-[#f0faf4] rounded-2xl p-4 mb-5 border border-[#b7e4cc]">
+        {/* Info — penjelasan lengkap cara kerja */}
+        <div className="bg-[#f0faf4] rounded-2xl p-4 mb-4 border border-[#b7e4cc]">
           <div className="flex items-start gap-3">
             <span className="text-xl">💡</span>
             <div>
               <p className="text-xs font-semibold text-[#2D6A4F] mb-1">Cara kerja jadwal donasi</p>
               <p className="text-xs text-[#5a7a6a] leading-relaxed">
-                Set jadwal sekali, donasi akan otomatis muncul di Food Rescue sesuai hari dan jam yang kamu tentukan. Cocok untuk warung yang rutin punya sisa makanan.
+                Jadwal donasi adalah <span className="font-semibold">pengingat & rencana rutinmu</span> — bukan posting otomatis.
+                Kamu mendaftar makanan apa yang biasa tersisa, di hari & jam berapa. Saat hari itu tiba, kamu tinggal <span className="font-semibold">klik "Posting Sekarang"</span> untuk langsung membuat donasi dengan data yang sudah tersimpan.
               </p>
             </div>
           </div>
         </div>
+
+        {/* Banner jadwal yang akan segera jatuh tempo hari ini */}
+        <JadwalHariIni jadwal={jadwal} userId={user?.id} onRefresh={fetchJadwal} />
 
         {/* Tombol Tambah */}
         <button

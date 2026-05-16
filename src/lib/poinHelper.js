@@ -6,6 +6,8 @@ export const POIN_AKSI = {
   volunteer_relay: 30,
   tracking_gizi: 10,
   input_balita: 20,
+  upload_video: 10,
+  upload_recipe : 10,
 }
 
 // Fungsi utama: tambah poin user
