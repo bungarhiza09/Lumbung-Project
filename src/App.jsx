@@ -14,15 +14,6 @@ import GamifikasiPage from './pages/gamifikasi/GamifikasiPage'
 import RiwayatDonasi from './pages/food rescue/RiwayatDonasi'
 import ImpactDashboard from './pages/food rescue/ImpactDashboard'
 import JadwalDonasi from './pages/food rescue/JadwalDonasi'
-import DaftarBalita   from './pages/input balita/DaftarBalita'
-import DetailBalita   from './pages/input balita/DetailBalita'
-import InputBalita    from './pages/input balita/InputBalita'
-import PetaGizi       from './pages/gizi/PetaGizi'
-import TrenGizi       from './pages/gizi/TrenGizi'
-import ExportLaporan  from './pages/laporan/ExportLaporan'
-
-// Di dalam <Routes> tambahkan:
-<Route path="/pengetahuan" element={<PengetahuanPage />} />
 import SmartWarung from './pages/smart warung/SmartWarung'
 import ProfilPage from './pages/profil/ProfilPage'
 import DaftarBalita   from './pages/health dashboard/input balita/DaftarBalita'
