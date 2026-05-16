@@ -37,6 +37,8 @@ export default function Navbar() {
   const location = useLocation()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
 
   const navItems = NAV_MAP[profile?.role] || NAV_KELUARGA
 
@@ -148,48 +150,162 @@ export default function Navbar() {
         </div>
       </nav>
 
-      <nav className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-[#e8e4db] px-1 py-2 shadow-lg">
-        <div className="flex justify-around">
-          {navItems.slice(0, 4).map(item => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl transition-all min-w-0 ${
-                location.pathname === item.path
-                  ? 'text-[#2D6A4F]'
-                  : 'text-[#9a9a8a]'
-              }`}
-            >
-              <span className={`text-xl transition-transform ${location.pathname === item.path ? 'scale-110' : ''}`}>
-                {item.icon}
-              </span>
-              <span className="text-[9px] font-medium truncate max-w-full">{item.label}</span>
-              {location.pathname === item.path && (
-                <div className="w-1 h-1 rounded-full bg-[#2D6A4F]" />
-              )}
-            </Link>
-          ))}
+      {/* MOBILE TOPBAR */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-[#e8e4db] shadow-sm">
+        <div className="flex items-center justify-between px-4 py-3">
 
-          {/* Profile tab */}
-          <Link
-            to="/profil"
-            className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl transition-all ${
-              location.pathname === '/profil' ? 'text-[#2D6A4F]' : 'text-[#9a9a8a]'
-            }`}
-          >
-            <div className={`w-6 h-6 rounded-full ${roleColor} flex items-center justify-center text-white text-xs font-bold overflow-hidden`}>
-              {profile?.avatar_url
-                ? <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                : profile?.nama?.[0]?.toUpperCase() || 'U'
-              }
+          {/* Logo / Title */}
+          <div>
+            <h1 className="text-sm font-bold text-[#2D6A4F]">
+              🌾 Lumbung
+            </h1>
+            <p className="text-[10px] text-[#9a9a8a]">
+              Food Rescue Platform
+            </p>
+          </div>
+
+          {/* Right Menu */}
+          <div className="flex items-center gap-3">
+
+            <div className="relative">
+              <button
+                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                className={`w-9 h-9 rounded-full ${roleColor} flex items-center justify-center text-white text-sm font-bold overflow-hidden shadow-sm`}
+              >
+                {profile?.avatar_url
+                  ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  )
+                  : profile?.nama?.[0]?.toUpperCase() || 'U'
+                }
+              </button>
+
+              {profileMenuOpen && (
+                <div className="absolute right-0 mt-2 w-44 bg-white rounded-2xl shadow-xl border border-[#e8e4db] overflow-hidden z-50">
+
+                  <Link
+                    to="/profil"
+                    onClick={() => setProfileMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-[#f5f5f5]"
+                  >
+                    👤 Profil
+                  </Link>
+
+                  <Link
+                    to="/gamifikasi"
+                    onClick={() => setProfileMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-[#f5f5f5]"
+                  >
+                    🏆 Gamifikasi
+                  </Link>
+
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left flex items-center gap-3 px-4 py-3 text-sm text-red-500 hover:bg-red-50"
+                  >
+                    🚪 Keluar
+                  </button>
+                </div>
+              )}
             </div>
-            <span className="text-[9px] font-medium">Profil</span>
-            {location.pathname === '/profil' && (
-              <div className="w-1 h-1 rounded-full bg-[#2D6A4F]" />
-            )}
-          </Link>
+
+            {/* Hamburger */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="w-9 h-9 rounded-xl border border-[#e8e4db] flex items-center justify-center bg-white"
+            >
+              ☰
+            </button>
+          </div>
         </div>
-      </nav>
+      </div>
+
+      {/* MOBILE SIDEBAR */}
+      {sidebarOpen && (
+        <>
+          {/* Overlay */}
+          <div
+            className="md:hidden fixed inset-0 bg-black/40 z-50"
+            onClick={() => setSidebarOpen(false)}
+          />
+
+          {/* Sidebar */}
+          <div className="md:hidden fixed top-0 right-0 h-full w-72 bg-white z-50 shadow-2xl p-5 overflow-y-auto">
+
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="font-bold text-[#1a3a2a]">
+                  Menu
+                </h2>
+                <p className="text-xs text-[#9a9a8a]">
+                  Navigasi aplikasi
+                </p>
+              </div>
+
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="text-xl text-[#7a8a7a]"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* User */}
+            <div className="flex items-center gap-3 bg-[#f8faf8] rounded-2xl p-3 mb-5 border border-[#e8e4db]">
+              <div className={`w-12 h-12 rounded-full ${roleColor} flex items-center justify-center text-white font-bold overflow-hidden`}>
+                {profile?.avatar_url
+                  ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  )
+                  : profile?.nama?.[0]?.toUpperCase() || 'U'
+                }
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold text-[#1a3a2a]">
+                  {profile?.nama}
+                </p>
+                <p className="text-xs text-[#7a8a7a] capitalize">
+                  {profile?.role}
+                </p>
+              </div>
+            </div>
+
+            {/* Menu Items */}
+            <div className="space-y-2">
+              {navItems.map(item => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => setSidebarOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all ${
+                    location.pathname === item.path
+                      ? 'bg-[#2D6A4F] text-white'
+                      : 'text-[#4a4a3a] hover:bg-[#f5f5f5]'
+                  }`}
+                >
+                  <span className="text-xl">
+                    {item.icon}
+                  </span>
+
+                  <span className="text-sm font-medium">
+                    {item.label}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Spacer */}
       <div className="h-16 hidden md:block" />
