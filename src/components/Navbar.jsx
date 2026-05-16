@@ -148,8 +148,7 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* Mobile Bottom Nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-[#e8e4db] px-1 py-2 shadow-lg">
+      <nav className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-[#e8e4db] px-1 py-2 shadow-lg">
         <div className="flex justify-around">
           {navItems.slice(0, 4).map(item => (
             <Link
