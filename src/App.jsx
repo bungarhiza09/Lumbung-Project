@@ -23,6 +23,16 @@ import ExportLaporan  from './pages/laporan/ExportLaporan'
 
 // Di dalam <Routes> tambahkan:
 <Route path="/pengetahuan" element={<PengetahuanPage />} />
+import SmartWarung from './pages/smart warung/SmartWarung'
+import ProfilPage from './pages/profil/ProfilPage'
+import DaftarBalita   from './pages/health dashboard/input balita/DaftarBalita'
+import DetailBalita   from './pages/health dashboard/input balita/DetailBalita'
+import InputBalita    from './pages/health dashboard/input balita/InputBalita'
+import PetaGizi       from './pages/health dashboard/gizi/PetaGizi'
+import TrenGizi       from './pages/health dashboard/gizi/TrenGizi'
+import ExportLaporan  from './pages/health dashboard/laporan/ExportLaporan'
+import DaftarWarung  from './pages/food rescue/DaftarWarung'
+import DetailWarung  from './pages/food rescue/DetailWarung'
 
 function App() {
   const { user, profile, loading } = useAuth()
@@ -30,8 +40,9 @@ function App() {
   if (loading) return (
     <div className="min-h-screen bg-[#f5f3ee] flex items-center justify-center">
       <div className="text-center">
-        <div className="text-4xl mb-3">🌾</div>
-        <div className="text-sm text-[#5a7a6a]">Memuat LUMBUNG...</div>
+        <div className="text-5xl mb-4 animate-bounce">🌾</div>
+        <div className="w-8 h-8 border-3 border-[#2D6A4F]/20 border-t-[#2D6A4F] rounded-full animate-spin mx-auto mb-3" />
+        <div className="text-sm font-medium text-[#2D6A4F]">Memuat LUMBUNG...</div>
       </div>
     </div>
   )
@@ -46,42 +57,55 @@ function App() {
 
   return (
     <Routes>
-      //Auth
+      {/* Auth */}
       <Route path="/auth" element={!user ? <AuthPage /> : <Navigate to="/dashboard" />} />
-      
-      //Dashboard
+
+      {/* Dashboard */}
       <Route path="/dashboard" element={getDashboard()} />
       <Route path="*" element={<Navigate to={user ? "/dashboard" : "/auth"} />} />
 
-      //Nutrisi AI
+      {/* Nutrisi AI */}
       <Route path="/nutrisi" element={user ? <NutrisiAI /> : <Navigate to="/auth" />} />
 
-      //Food Rescue
+      {/* Food Rescue */}
       <Route path="/food-rescue" element={user ? <FoodRescue /> : <Navigate to="/auth" />} />
       <Route path="/donasi/buat" element={user ? <PostingDonasi /> : <Navigate to="/auth" />} />
       <Route path="/donasi/riwayat" element={user ? <RiwayatDonasi /> : <Navigate to="/auth" />} />
       <Route path="/impact" element={user ? <ImpactDashboard /> : <Navigate to="/auth" />} />
       <Route path="/donasi/jadwal" element={user ? <JadwalDonasi /> : <Navigate to="/auth" />} />
+      <Route path="/donasi" element={user ? <RiwayatDonasi /> : <Navigate to="/auth" />} />
+      <Route path="/warung" element={user ? <DaftarWarung /> : <Navigate to="/auth" />} />
+      <Route path="/warung/:id" element={user ? <DetailWarung /> : <Navigate to="/auth" />} />
 
-      //Chat
+      {/* Chat */}
       <Route path="/chat" element={user ? <DaftarChat /> : <Navigate to="/auth" />} />
       <Route path="/chat/:roomId" element={user ? <ChatDonasi /> : <Navigate to="/auth" />} />
 
-      //Chatbot Pengetahuan
+      {/* Chatbot Pengetahuan */}
       <Route path="/pengetahuan" element={<PengetahuanPage />} />
 
       // Gamifikasi
       <Route path="/gamifikasi" element={<GamifikasiPage />} />
       //Balita
+      {/* Gamifikasi */}
+      <Route path="/gamifikasi" element={<GamifikasiPage />} />
+
+      {/* Smart Warung */}
+      <Route path="/smart-warung" element={user ? <SmartWarung /> : <Navigate to="/auth" />} />
+
+      {/* Profil */}
+      <Route path="/profil" element={<ProfilPage />} />
+
+      {/* Balita */}
       <Route path="/balita"          element={<DaftarBalita />} />
       <Route path="/balita/input"    element={<InputBalita />} />
       <Route path="/balita/:id"      element={<DetailBalita />} />
 
-      //gizi
+      {/* Gizi */}
       <Route path="/peta-gizi"       element={<PetaGizi />} />
       <Route path="/tren-gizi"       element={<TrenGizi />} />
 
-      //laporan
+      {/* Laporan */}
       <Route path="/laporan"         element={<ExportLaporan />} />
       
     </Routes>

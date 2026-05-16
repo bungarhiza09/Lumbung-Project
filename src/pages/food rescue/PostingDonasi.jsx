@@ -90,7 +90,7 @@ export default function PostingDonasi() {
 
   return (
     <Layout>
-      <div className="max-w-lg mx-auto">
+      <div className="w-full px-4">
 
         {/* Header Hero */}
         <div className="relative bg-gradient-to-br from-[#F4A261] to-[#e8924f] rounded-3xl p-5 mb-6 overflow-hidden">

@@ -20,7 +20,7 @@ export default function PengetahuanPage() {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto">
+      <div className="w-full px-4">
 
         {/* Hero */}
         <div className="relative bg-gradient-to-br from-[#1a3a2a] to-[#2D6A4F] rounded-3xl p-5 mb-5 overflow-hidden">

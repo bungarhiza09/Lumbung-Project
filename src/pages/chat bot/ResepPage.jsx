@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+import { tambahPoin } from '../../lib/poinHelper'
 
 const CATEGORIES = ['Semua', 'MPASI', 'Balita', 'Umum', 'Ibu Hamil', 'Lansia']
 
@@ -12,6 +13,7 @@ export default function ResepPage() {
   const [selected, setSelected] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [showSuccess, setShowSuccess] = useState(false)
 
   useEffect(() => { fetchRecipes() }, [category, maxBudget])
 
@@ -26,7 +28,57 @@ export default function ResepPage() {
     setLoading(false)
   }
 
-  if (showForm) return <TambahResepForm onBack={() => { setShowForm(false); fetchRecipes() }} />
+  if (showForm) {
+    return (
+      <>
+        <TambahResepForm
+          onSuccess={() => {
+            setShowSuccess(true)
+            fetchRecipes()
+
+            setTimeout(() => {
+              setShowSuccess(false)
+            }, 3000)
+          }}
+          onBack={() => {
+            setShowForm(false)
+            fetchRecipes()
+          }}
+        />
+
+        {/* Success Popup */}
+        {showSuccess && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+            <div className="bg-white rounded-3xl p-5 w-full max-w-sm shadow-2xl animate-[fadeIn_.2s_ease]">
+              <div className="w-16 h-16 rounded-full bg-[#f0faf4] flex items-center justify-center text-3xl mx-auto mb-4">
+                🎉
+              </div>
+
+              <h3 className="text-base font-bold text-center text-[#1a3a2a]">
+                Resep Berhasil Ditambahkan!
+              </h3>
+
+              <p className="text-sm text-[#6b7b70] text-center mt-2 leading-relaxed">
+                Terima kasih sudah berbagi resep sehat 🥘
+                <br />
+                Kamu mendapat <span className="font-bold text-[#2D6A4F]">+10 poin</span>
+              </p>
+
+              <button
+                onClick={() => {
+                  setShowSuccess(false)
+                  setShowForm(false)
+                }}
+                className="w-full mt-5 bg-[#2D6A4F] hover:bg-[#235c43] text-white py-3 rounded-2xl text-sm font-semibold transition-all"
+              >
+                Oke
+              </button>
+            </div>
+          </div>
+        )}
+      </>
+    )
+  }
   if (selected) return <RecipeDetail recipe={selected} onBack={() => setSelected(null)} />
 
   return (
@@ -36,6 +88,9 @@ export default function ResepPage() {
         <div className="bg-[#f0faf4] rounded-2xl p-3 flex-1 border border-[#b7e4cc]">
           <p className="text-xs font-semibold text-[#2D6A4F] mb-0.5">📖 Resep Lokal Bergizi</p>
           <p className="text-xs text-[#5a7a6a]">Resep berbahan lokal Indonesia yang murah dan bergizi.</p>
+          <div className="mt-2 inline-flex items-center gap-1 bg-[#fff7d6] text-[#8a6d1f] border border-[#ffe58f] px-2 py-1 rounded-full text-[11px] font-semibold">
+            ⭐ Upload resep = +10 poin
+          </div>
         </div>
         {user && (
           <button
@@ -126,7 +181,7 @@ export default function ResepPage() {
 }
 
 // ─── Form Tambah Resep ───────────────────────────────────────
-function TambahResepForm({ onBack }) {
+function TambahResepForm({ onBack, onSuccess }) {
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({
@@ -150,8 +205,10 @@ function TambahResepForm({ onBack }) {
 
   async function handleSubmit() {
     if (!form.title || !form.budget_per_portion) return
+
     setLoading(true)
-    await supabase.from('recipes').insert({
+
+    const { error } = await supabase.from('recipes').insert({
       title: form.title,
       description: form.description,
       budget_per_portion: parseInt(form.budget_per_portion),
@@ -164,15 +221,34 @@ function TambahResepForm({ onBack }) {
         zat_besi: parseFloat(form.zat_besi) || 0
       },
       ingredients: form.bahan.filter(b => b.nama).map(b => ({
-        nama: b.nama, jumlah: b.jumlah, satuan: b.satuan,
+        nama: b.nama,
+        jumlah: b.jumlah,
+        satuan: b.satuan,
         harga_estimasi: parseInt(b.harga_estimasi) || 0
       })),
       steps: form.langkah.filter(l => l.instruksi).map((l, i) => ({
-        urutan: i + 1, instruksi: l.instruksi
+        urutan: i + 1,
+        instruksi: l.instruksi
       })),
     })
+
+    if (!error) {
+      await tambahPoin(
+        user.id,
+        'upload_recipe',
+        `Upload resep: ${form.title}`
+      )
+
+      setLoading(false)
+
+      if (onSuccess) {
+        onSuccess()
+      }
+
+      return
+    }
+
     setLoading(false)
-    onBack()
   }
 
   const inputClass = "w-full px-3 py-2.5 rounded-xl border border-[#e8e4db] bg-[#faf9f7] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 focus:border-[#2D6A4F] transition-all"

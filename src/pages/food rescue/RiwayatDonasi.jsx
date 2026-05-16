@@ -53,7 +53,7 @@ export default function RiwayatDonasi() {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto">
+      <div className="w-full px-4">
 
         {/* Header */}
         <div className="mb-6">

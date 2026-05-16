@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+import { tambahPoin } from '../../lib/poinHelper'
 
 export default function KelasPage() {
   const { profile, user } = useAuth()
@@ -9,6 +10,7 @@ export default function KelasPage() {
   const [selected, setSelected] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [showSuccess, setShowSuccess] = useState(false)
 
   useEffect(() => { fetchData() }, [])
 
@@ -35,11 +37,58 @@ export default function KelasPage() {
 
   const totalCompleted = Object.values(progress).filter(p => p.completed).length
 
-  if (showForm) return (
-    <TambahModulForm
-      onBack={() => { setShowForm(false); fetchData() }}
-    />
-  )
+  if (showForm) {
+    return (
+      <>
+        <TambahModulForm
+          onSuccess={() => {
+            setShowSuccess(true)
+            fetchData()
+
+            setTimeout(() => {
+              setShowSuccess(false)
+            }, 3000)
+          }}
+          onBack={() => {
+            setShowForm(false)
+            fetchData()
+          }}
+        />
+
+        {/* Popup Success */}
+        {showSuccess && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+            <div className="bg-white rounded-3xl p-5 w-full max-w-sm shadow-2xl animate-[fadeIn_.2s_ease]">
+
+              <div className="w-16 h-16 rounded-full bg-[#f0faf4] flex items-center justify-center text-3xl mx-auto mb-4">
+                🎉
+              </div>
+
+              <h3 className="text-base font-bold text-center text-[#1a3a2a]">
+                Topik Kuis Berhasil Ditambahkan!
+              </h3>
+
+              <p className="text-sm text-[#6b7b70] text-center mt-2 leading-relaxed">
+                Terima kasih sudah menambahkan topik edukasi 📚
+                <br />
+                Kamu mendapat <span className="font-bold text-[#2D6A4F]">+10 poin</span>
+              </p>
+
+              <button
+                onClick={() => {
+                  setShowSuccess(false)
+                  setShowForm(false)
+                }}
+                className="w-full mt-5 bg-[#2D6A4F] hover:bg-[#235c43] text-white py-3 rounded-2xl text-sm font-semibold transition-all"
+              >
+                Oke
+              </button>
+            </div>
+          </div>
+        )}
+      </>
+    )
+  }
 
   if (selected) return (
     <ModuleDetail
@@ -58,6 +107,10 @@ export default function KelasPage() {
         <div className="bg-[#f0faf4] rounded-2xl p-3 flex-1 border border-[#b7e4cc] mr-2">
           <p className="text-xs font-semibold text-[#2D6A4F] mb-0.5">🎓 Kuis Pengetahuan Gizi</p>
           <p className="text-xs text-[#5a7a6a]">Uji pengetahuan gizimu! Selesaikan semua topik untuk dapat sertifikat.</p>
+          <div className="mt-2 inline-flex items-center gap-1 bg-[#fff7d6] text-[#8a6d1f] border border-[#ffe58f] px-2 py-1 rounded-full text-[11px] font-semibold">
+            ⭐ Tambah topik kuis = +10 poin
+          </div>
+
         </div>
         {profile?.role === 'kader' && (
           <button
@@ -162,7 +215,7 @@ export default function KelasPage() {
 }
 
 // ─── Form Tambah Modul (khusus kader) ───────────────────────────
-function TambahModulForm({ onBack }) {
+function TambahModulForm({ onBack, onSuccess }) {
   const { user } = useAuth()
   const [step, setStep] = useState(1) // step 1: info modul, step 2: tambah soal kuis
   const [loading, setLoading] = useState(false)
@@ -228,9 +281,21 @@ function TambahModulForm({ onBack }) {
         }))
       )
     }
+    await tambahPoin(
+      user.id,
+      'upload_kelas',
+      `Menambahkan topik kuis: ${modulForm.title}`
+    )
 
     setLoading(false)
-    onBack()
+
+    if (onSuccess) {
+      onSuccess()
+    }
+
+    setTimeout(() => {
+        onBack?.()
+      }, 5000)
   }
 
   function updateQuiz(idx, field, val) {
